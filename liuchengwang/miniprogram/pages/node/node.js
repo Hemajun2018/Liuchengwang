@@ -21,10 +21,32 @@ Page({
     
     // 获取项目信息
     const projectInfo = getApp().globalData.projectInfo;
-    this.setData({ projectInfo });
     
     // 获取元素ID
     const id = options.id;
+    
+    // 如果有项目ID和节点ID，跳转到详情页面
+    if (id && projectInfo && projectInfo.id) {
+      console.log('跳转到节点详情页', id, projectInfo.id);
+      wx.redirectTo({
+        url: `/pages/node/detail?nodeId=${id}&projectId=${projectInfo.id}`
+      });
+      return;
+    }
+    
+    // 如果只有节点ID但没有项目ID，从本地存储获取项目ID
+    if (id && !projectInfo) {
+      const cachedProject = wx.getStorageSync('projectInfo');
+      if (cachedProject && cachedProject.id) {
+        console.log('从缓存获取项目信息，跳转到节点详情页', id, cachedProject.id);
+        wx.redirectTo({
+          url: `/pages/node/detail?nodeId=${id}&projectId=${cachedProject.id}`
+        });
+        return;
+      }
+    }
+    
+    this.setData({ projectInfo });
     
     // 加载元素详情
     this.loadElementDetail(id);

@@ -8,7 +8,14 @@
     <view class="node-info">
       <view class="node-icon">📍</view>
       <view class="node-name">{{nodeName}}</view>
+      <view class="node-status status-{{nodeStatus}}">{{nodeStatusText}}</view>
     </view>
+  </view>
+  
+  <!-- 错误提示 -->
+  <view class="error-container" wx:if="{{error}}">
+    <view class="error-icon">❌</view>
+    <view class="error-text">{{error}}</view>
   </view>
   
   <!-- 交付内容列表 -->
@@ -24,38 +31,53 @@
   </view>
   
   <!-- 空状态提示 -->
-  <view class="empty-container" wx:elif="{{deliverables.length === 0}}">
+  <view class="empty-container" wx:elif="{{!loading && deliverables.length === 0}}">
     <view class="empty-icon">📝</view>
     <view class="empty-text">暂无交付内容</view>
   </view>
   
   <!-- 交付内容列表 -->
-  <view class="deliverables-list" wx:else>
+  <view class="deliverables-list" wx:elif="{{!loading && deliverables.length > 0}}">
     <view class="deliverable-card" wx:for="{{deliverables}}" wx:key="id">
       <!-- 交付内容标题和状态 -->
       <view class="deliverable-header">
-        <view class="deliverable-title">{{item.description}}</view>
-        <view class="deliverable-status status-{{item.status}}">{{item.statusText}}</view>
+        <view class="deliverable-title">{{item.name}}</view>
+        <view class="deliverable-status status-{{item.status}}">{{item.status_text || '未知状态'}}</view>
+      </view>
+      
+      <!-- 交付内容描述 -->
+      <view class="deliverable-description" wx:if="{{item.description}}">
+        {{item.description}}
       </view>
       
       <!-- 交付内容时间信息 -->
       <view class="deliverable-info">
-        <view class="info-item" wx:if="{{item.formattedStartDate}}">
+        <view class="info-item" wx:if="{{item.start_date}}">
           <view class="info-icon">🕒</view>
           <view class="info-label">开始时间:</view>
-          <view class="info-value">{{item.formattedStartDate}}</view>
+          <view class="info-value">{{item.start_date}}</view>
         </view>
         
-        <view class="info-item" wx:if="{{item.formattedEndDate}}">
+        <view class="info-item" wx:if="{{item.end_date}}">
           <view class="info-icon">🏁</view>
           <view class="info-label">结束时间:</view>
-          <view class="info-value">{{item.formattedEndDate}}</view>
+          <view class="info-value">{{item.end_date}}</view>
         </view>
-        
-        <view class="info-item" wx:if="{{item.duration_days}}">
-          <view class="info-icon">📅</view>
-          <view class="info-label">持续天数:</view>
-          <view class="info-value">{{item.duration_days}} 天</view>
+      </view>
+      
+      <!-- 交付内容附件 -->
+      <view class="deliverable-attachments" wx:if="{{item.attachments && item.attachments.length > 0}}">
+        <view class="attachment-title">📎 附件</view>
+        <view class="attachment-list">
+          <view class="attachment-item" 
+                wx:for="{{item.attachments}}" 
+                wx:key="id" 
+                wx:for-item="attachment"
+                data-url="{{attachment.url}}"
+                bindtap="previewAttachment">
+            <view class="attachment-icon">📄</view>
+            <view class="attachment-name">{{attachment.name}}</view>
+          </view>
         </view>
       </view>
     </view>

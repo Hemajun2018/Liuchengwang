@@ -25,10 +25,12 @@ const deliverable_entity_1 = require("../../database/entities/deliverable.entity
 const project_user_entity_1 = require("../../database/entities/project-user.entity");
 const user_entity_1 = require("../../database/entities/user.entity");
 const typeorm_3 = require("typeorm");
+const jwt_1 = require("@nestjs/jwt");
 let ProjectService = class ProjectService {
-    constructor(projectRepository, projectUserRepository) {
+    constructor(projectRepository, projectUserRepository, jwtService) {
         this.projectRepository = projectRepository;
         this.projectUserRepository = projectUserRepository;
+        this.jwtService = jwtService;
     }
     async create(createProjectDto, currentUser) {
         console.log('创建项目请求数据:', createProjectDto);
@@ -206,11 +208,22 @@ let ProjectService = class ProjectService {
         }
         const isPasswordValid = await bcrypt.compare(password, project.password);
         if (!isPasswordValid) {
-            console.log('项目密码错误');
-            throw new common_1.NotFoundException('项目密码错误');
+            console.log('密码不正确');
+            throw new common_1.NotFoundException('项目名或密码不正确');
         }
-        console.log('验证成功，返回数据:', project);
-        return project;
+        const payload = {
+            sub: project.id,
+            projectId: project.id,
+            projectName: project.name,
+            type: 'project_token'
+        };
+        const token = this.jwtService.sign(payload);
+        console.log('项目验证成功，生成token');
+        const { password: _, ...projectInfo } = project;
+        return {
+            ...projectInfo,
+            token
+        };
     }
     async updatePrerequisite(id, prerequisiteDto) {
         console.log('开始更新项目前置条件, ID:', id);
@@ -337,6 +350,7 @@ exports.ProjectService = ProjectService = __decorate([
     __param(0, (0, typeorm_1.InjectRepository)(project_entity_1.Project)),
     __param(1, (0, typeorm_1.InjectRepository)(project_user_entity_1.ProjectUser)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository])
+        typeorm_2.Repository,
+        jwt_1.JwtService])
 ], ProjectService);
 //# sourceMappingURL=project.service.js.map

@@ -400,9 +400,12 @@ let NodeService = NodeService_1 = class NodeService {
         this.logger.log(`项目ID: ${projectId}, 节点ID: ${nodeId}`);
         this.logger.log(`创建数据: ${JSON.stringify(createMaterialDto, null, 2)}`);
         try {
-            const node = await this.nodeRepository.findOne({
-                where: { id: nodeId, projectId },
-            });
+            const node = await this.nodeRepository
+                .createQueryBuilder('node')
+                .select(['node.id', 'node.projectId'])
+                .where('node.id = :nodeId', { nodeId })
+                .andWhere('node.projectId = :projectId', { projectId })
+                .getOne();
             if (!node) {
                 throw new Error('节点不存在');
             }

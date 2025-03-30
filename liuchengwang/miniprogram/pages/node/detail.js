@@ -1,5 +1,6 @@
 const app = getApp();
 const { request } = require('../../utils/request');
+const { isLoggedIn } = require('../../utils/auth');
 const cacheManager = require('../../utils/cache');
 
 Page({
@@ -11,12 +12,16 @@ Page({
     nodeStatus: 'not_started',
     nodeStatusText: '未开始',
     deliverables: [],
-    loading: true
+    loading: true,
+    error: null,
+    loadingFailed: false  // 新增：标记API请求是否失败
   },
 
   onLoad(options) {
+    console.log('节点详情页面加载, options:', options);
     const { nodeId, projectId } = options;
     
+    // 检查参数有效性
     if (!nodeId || !projectId) {
       wx.showToast({
         title: '参数错误',
@@ -28,158 +33,146 @@ Page({
     
     this.setData({ 
       nodeId,
-      projectId
+      projectId,
+      loading: true,
+      error: null
     });
     
-    this.loadNodeDetail();
+    // 获取项目和节点信息
+    this.initPageData();
   },
   
   onShow() {
-    // 每次显示页面时重新加载数据
     if (this.data.nodeId) {
-      this.loadNodeDetail();
+      // 如果已有数据，只需静默刷新
+      this.loadDeliverables(true);
     }
   },
   
-  // 加载节点详情
-  loadNodeDetail() {
-    this.setData({ loading: true });
+  // 初始化页面数据
+  initPageData() {
+    console.log('初始化页面数据');
+    this.setData({ loading: true, error: null });
     
-    // 使用Promise.all并行加载项目信息和节点信息
-    Promise.all([
-      this.loadProjectInfo(),
-      this.loadNodeInfo(),
-      this.loadDeliverables()
-    ])
-    .catch(error => {
-      console.error('加载节点详情失败:', error);
-    })
-    .finally(() => {
-      this.setData({ loading: false });
-    });
+    // 1. 获取项目名称
+    this.loadProjectInfo();
+    
+    // 2. 获取节点信息
+    this.loadNodeInfo();
+    
+    // 3. 获取交付内容
+    this.loadDeliverables();
   },
   
   // 加载项目信息
   loadProjectInfo() {
-    // 生成缓存键
-    const cacheKey = cacheManager.createProjectCacheKey(this.data.projectId, 'info');
+    // 优先尝试从全局数据和本地存储获取项目信息
+    const globalProjectInfo = app.globalData.projectInfo;
+    const localProjectInfo = wx.getStorageSync('projectInfo');
     
-    // 先尝试从缓存获取
-    const cachedInfo = cacheManager.getCache(cacheKey);
-    if (cachedInfo) {
-      console.log('从缓存加载项目信息:', cachedInfo);
-      this.setData({
-        projectName: cachedInfo.name || '未知项目'
+    if (globalProjectInfo && globalProjectInfo.id === this.data.projectId) {
+      console.log('从全局数据获取项目信息:', globalProjectInfo.name);
+      this.setData({ 
+        projectName: globalProjectInfo.name || '未知项目'
       });
-      
-      // 静默更新缓存
-      this.requestProjectInfo(true);
-      return Promise.resolve(cachedInfo);
+      return;
     }
     
-    // 缓存不存在，请求新数据
-    return this.requestProjectInfo();
-  },
-  
-  // 请求项目信息
-  requestProjectInfo(isSilent = false) {
-    if (!isSilent) {
-      this.setData({ loading: true });
+    if (localProjectInfo && localProjectInfo.id === this.data.projectId) {
+      console.log('从本地存储获取项目信息:', localProjectInfo.name);
+      this.setData({ 
+        projectName: localProjectInfo.name || '未知项目'
+      });
+      return;
     }
     
-    return request({
-      url: `/api/projects/${this.data.projectId}`,
-      method: 'GET',
-      showAuthDialog: !isSilent // 静默请求不显示认证对话框
-    })
-    .then(projectInfo => {
-      // 设置项目名称
-      this.setData({
-        projectName: projectInfo.name || '未知项目'
+    // 如果本地没有项目信息，则使用节点名称
+    const allNodes = app.globalData.elements || [];
+    const node = allNodes.find(item => item.id == this.data.nodeId);
+    if (node) {
+      this.setData({ 
+        projectName: '项目详情'
       });
-      
-      // 缓存项目信息
-      const cacheKey = cacheManager.createProjectCacheKey(this.data.projectId, 'info');
-      cacheManager.setCache(cacheKey, projectInfo);
-      
-      return projectInfo;
-    })
-    .catch(error => {
-      console.error('请求项目信息失败:', error);
-      
-      // 如果不是静默请求，则显示错误提示
-      if (!isSilent) {
-        // 尝试从全局数据或本地存储获取名称
-        const projectInfo = wx.getStorageSync('projectInfo');
-        if (projectInfo && projectInfo.id === this.data.projectId) {
-          this.setData({
-            projectName: projectInfo.name || '未知项目'
-          });
-        } else {
-          wx.showToast({
-            title: '获取项目信息失败',
-            icon: 'none'
-          });
-        }
-      }
-      
-      return Promise.reject(error);
+      return;
+    }
+    
+    // 最后使用默认名称
+    this.setData({ 
+      projectName: '项目详情'
     });
   },
   
   // 加载节点信息
   loadNodeInfo() {
-    // 生成缓存键
+    // 1. 优先从全局数据中获取节点
+    const allNodes = app.globalData.elements || [];
+    const node = allNodes.find(item => item.id == this.data.nodeId);
+    
+    if (node) {
+      console.log('从全局数据获取节点信息:', node);
+      const statusText = this.getStatusText(node.status);
+      this.setData({
+        nodeName: node.name || '',
+        nodeStatus: node.status || 'not_started',
+        nodeStatusText: statusText,
+        loading: false
+      });
+      return;
+    }
+    
+    // 2. 尝试从缓存中获取
     const cacheKey = cacheManager.createProjectCacheKey(
       this.data.projectId, 
       'node', 
       this.data.nodeId
     );
     
-    // 先尝试从缓存获取
     const cachedNode = cacheManager.getCache(cacheKey);
     if (cachedNode) {
-      console.log('从缓存加载节点信息:', cachedNode);
-      
-      // 获取状态文本
+      console.log('从缓存获取节点信息:', cachedNode);
       const statusText = this.getStatusText(cachedNode.status);
-      
       this.setData({
         nodeName: cachedNode.name || '',
         nodeStatus: cachedNode.status || 'not_started',
-        nodeStatusText: statusText
+        nodeStatusText: statusText,
+        loading: false
       });
-      
-      // 静默更新缓存
-      this.requestNodeInfo(true);
-      return Promise.resolve(cachedNode);
+      return;
     }
     
-    // 缓存不存在，请求新数据
-    return this.requestNodeInfo();
+    // 3. 尝试从API获取（可能会失败）
+    this.fetchNodeFromApi();
   },
   
-  // 请求节点信息
-  requestNodeInfo(isSilent = false) {
-    if (!isSilent) {
-      this.setData({ loading: true });
+  // 从API获取节点信息
+  fetchNodeFromApi() {
+    console.log('从API获取节点信息');
+    // 避免重复请求
+    if (this.data.loadingFailed) {
+      this.setData({
+        nodeName: `节点${this.data.nodeId}`,
+        nodeStatus: 'not_started',
+        nodeStatusText: '未知状态',
+        loading: false,
+        error: '无法获取节点信息，请检查网络连接或联系管理员'
+      });
+      return;
     }
     
-    return request({
+    request({
       url: `/api/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
-      method: 'GET',
-      showAuthDialog: !isSilent // 静默请求不显示认证对话框
+      method: 'GET'
     })
     .then(nodeInfo => {
-      console.log('获取到的节点信息:', nodeInfo);
+      console.log('获取节点信息成功:', nodeInfo);
       
-      // 获取状态文本
       const statusText = this.getStatusText(nodeInfo.status);
       
       this.setData({
         nodeName: nodeInfo.name || '',
         nodeStatus: nodeInfo.status || 'not_started',
-        nodeStatusText: statusText
+        nodeStatusText: statusText,
+        loading: false
       });
       
       // 缓存节点信息
@@ -189,83 +182,84 @@ Page({
         this.data.nodeId
       );
       cacheManager.setCache(cacheKey, nodeInfo);
-      
-      return nodeInfo;
     })
     .catch(error => {
-      console.error('请求节点信息失败:', error);
+      console.error('获取节点信息失败:', error);
       
-      // 如果不是静默请求，则显示错误提示
-      if (!isSilent) {
-        wx.showToast({
-          title: '获取节点详情失败',
-          icon: 'none'
-        });
-      }
-      
-      return Promise.reject(error);
+      this.setData({
+        nodeName: `节点${this.data.nodeId}`,
+        nodeStatus: 'not_started',
+        nodeStatusText: '未知状态',
+        loadingFailed: true,
+        loading: false,
+        error: '无法获取节点信息，请检查网络连接或联系管理员'
+      });
     });
   },
   
   // 加载交付内容
-  loadDeliverables() {
-    // 生成缓存键
+  loadDeliverables(isSilent = false) {
+    if (!isSilent) {
+      this.setData({ loading: true });
+    }
+    
+    // 避免重复请求
+    if (this.data.loadingFailed && !isSilent) {
+      this.setData({
+        deliverables: [],
+        loading: false,
+        error: this.data.error || '无法获取交付内容，请检查网络连接或联系管理员'
+      });
+      return;
+    }
+    
+    // 尝试从缓存获取
     const cacheKey = cacheManager.createProjectCacheKey(
       this.data.projectId, 
       'deliverables', 
       this.data.nodeId
     );
     
-    // 先尝试从缓存获取
     const cachedDeliverables = cacheManager.getCache(cacheKey);
     if (cachedDeliverables) {
-      console.log('从缓存加载交付内容:', cachedDeliverables);
-      
-      // 处理交付内容数据
-      const processedDeliverables = cachedDeliverables.map(deliverable => ({
-        ...deliverable,
-        formattedStartDate: this.formatDate(deliverable.start_date),
-        formattedEndDate: this.formatDate(deliverable.expected_end_date),
-        statusText: this.getStatusText(deliverable.status)
-      }));
+      console.log('从缓存获取交付内容:', cachedDeliverables);
       
       this.setData({
-        deliverables: processedDeliverables
+        deliverables: cachedDeliverables,
+        loading: false
       });
       
       // 静默更新缓存
-      this.requestDeliverables(true);
-      return Promise.resolve(cachedDeliverables);
+      if (!isSilent) {
+        this.fetchDeliverablesFromApi(true);
+      }
+      return;
     }
     
-    // 缓存不存在，请求新数据
-    return this.requestDeliverables();
+    // 从API获取
+    this.fetchDeliverablesFromApi(isSilent);
   },
   
-  // 请求交付内容
-  requestDeliverables(isSilent = false) {
-    if (!isSilent) {
-      this.setData({ loading: true });
-    }
+  // 从API获取交付内容
+  fetchDeliverablesFromApi(isSilent = false) {
+    console.log('从API获取交付内容');
     
-    return request({
+    request({
       url: `/api/projects/${this.data.projectId}/nodes/${this.data.nodeId}/deliverables`,
-      method: 'GET',
-      showAuthDialog: !isSilent // 静默请求不显示认证对话框
+      method: 'GET'
     })
     .then(deliverables => {
-      console.log('获取到的交付内容:', deliverables);
+      console.log('获取交付内容成功:', deliverables);
       
-      // 处理交付内容数据
-      const processedDeliverables = deliverables.map(deliverable => ({
-        ...deliverable,
-        formattedStartDate: this.formatDate(deliverable.start_date),
-        formattedEndDate: this.formatDate(deliverable.expected_end_date),
-        statusText: this.getStatusText(deliverable.status)
+      // 处理每个交付内容以确保状态文本
+      const processedDeliverables = deliverables.map(item => ({
+        ...item,
+        status_text: item.status_text || this.getStatusText(item.status)
       }));
       
       this.setData({
-        deliverables: processedDeliverables
+        deliverables: processedDeliverables,
+        loading: false
       });
       
       // 缓存交付内容
@@ -274,52 +268,25 @@ Page({
         'deliverables', 
         this.data.nodeId
       );
-      cacheManager.setCache(cacheKey, deliverables);
-      
-      return deliverables;
+      cacheManager.setCache(cacheKey, processedDeliverables);
     })
     .catch(error => {
-      console.error('请求交付内容失败:', error);
+      console.error('获取交付内容失败:', error);
       
-      // 如果不是静默请求，则显示错误提示
       if (!isSilent) {
-        wx.showToast({
-          title: '获取交付内容失败',
-          icon: 'none'
+        this.setData({
+          deliverables: [],
+          loadingFailed: true,
+          loading: false,
+          error: '无法获取交付内容，请检查网络连接或联系管理员'
         });
+      } else {
+        // 静默请求失败则不更新UI
+        this.setData({ loading: false });
       }
-      
-      return Promise.reject(error);
     });
   },
-  
-  // 格式化日期
-  formatDate(date) {
-    if (!date) {
-      return '';
-    }
-    
-    try {
-      // 确保date是Date对象
-      const dateObj = date instanceof Date ? date : new Date(date);
-      
-      // 检查日期是否有效
-      if (isNaN(dateObj.getTime())) {
-        return '';
-      }
-      
-      // 格式化为YYYY-MM-DD
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error('日期格式化错误:', error);
-      return '';
-    }
-  },
-  
+
   // 获取状态文本
   getStatusText(status) {
     // 如果状态是数字，转换为对应的状态码
@@ -328,7 +295,7 @@ Page({
         0: 'not_started',
         1: 'in_progress',
         2: 'completed',
-        3: 'delayed'
+        3: 'blocked'
       };
       status = numericStatusMap[status] || status;
     }
@@ -337,17 +304,126 @@ Page({
       'not_started': '未开始',
       'in_progress': '进行中',
       'completed': '已完成',
-      'delayed': '已延期',
       'blocked': '已阻塞',
       'pending': '待处理',
-      'resolved': '已解决'
+      'delayed': '延期'
     };
-    
     return statusMap[status] || '未知状态';
   },
   
-  // 返回流程图
+  // 返回上一页
   goBack() {
     wx.navigateBack();
+  },
+
+  // 预览附件
+  previewAttachment(e) {
+    const { url } = e.currentTarget.dataset;
+    if (!url) {
+      wx.showToast({
+        title: '附件地址无效',
+        icon: 'none'
+      });
+      return;
+    }
+
+    // 根据文件类型处理预览
+    const fileType = this.getFileType(url);
+    
+    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(fileType)) {
+      // 使用文档预览
+      wx.showLoading({
+        title: '打开文档中...'
+      });
+      
+      wx.downloadFile({
+        url,
+        success: (res) => {
+          wx.hideLoading();
+          if (res.statusCode === 200) {
+            wx.openDocument({
+              filePath: res.tempFilePath,
+              success: () => {
+                console.log('打开文档成功');
+              },
+              fail: (error) => {
+                console.error('打开文档失败:', error);
+                wx.showToast({
+                  title: '打开文档失败',
+                  icon: 'none'
+                });
+              }
+            });
+          }
+        },
+        fail: (error) => {
+          wx.hideLoading();
+          console.error('下载文件失败:', error);
+          wx.showToast({
+            title: '下载文件失败',
+            icon: 'none'
+          });
+        }
+      });
+    } else if (['jpg', 'jpeg', 'png', 'gif'].includes(fileType)) {
+      // 图片预览
+      wx.previewImage({
+        urls: [url],
+        fail: (error) => {
+          console.error('预览图片失败:', error);
+          wx.showToast({
+            title: '预览图片失败',
+            icon: 'none'
+          });
+        }
+      });
+    } else {
+      // 其他类型文件,提示下载
+      wx.showModal({
+        title: '提示',
+        content: '该类型文件暂不支持预览,是否下载?',
+        success: (res) => {
+          if (res.confirm) {
+            wx.downloadFile({
+              url,
+              success: (res) => {
+                if (res.statusCode === 200) {
+                  wx.saveFile({
+                    tempFilePath: res.tempFilePath,
+                    success: (res) => {
+                      wx.showToast({
+                        title: '文件已保存',
+                        icon: 'success'
+                      });
+                    },
+                    fail: (error) => {
+                      console.error('保存文件失败:', error);
+                      wx.showToast({
+                        title: '保存文件失败',
+                        icon: 'none'
+                      });
+                    }
+                  });
+                }
+              },
+              fail: (error) => {
+                console.error('下载文件失败:', error);
+                wx.showToast({
+                  title: '下载文件失败',
+                  icon: 'none'
+                });
+              }
+            });
+          }
+        }
+      });
+    }
+  },
+
+  // 获取文件类型
+  getFileType(url) {
+    if (!url) return '';
+    const match = url.match(/\.([^.]+)$/);
+    return match ? match[1].toLowerCase() : '';
   }
 }); 

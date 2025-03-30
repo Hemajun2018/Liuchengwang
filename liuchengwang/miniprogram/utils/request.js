@@ -1,6 +1,6 @@
 // 网络请求封装
 const BASE_URL = 'http://localhost:3000'; // 开发环境API地址，生产环境需要修改
-const MOCK_MODE = true; // 是否使用模拟数据模式
+const MOCK_MODE = false; // 关闭模拟模式，使用真实API
 
 // 模拟数据
 const mockData = {
@@ -199,52 +199,81 @@ const request = (options) => {
   if (MOCK_MODE) {
     return mockRequest(options);
   }
-  
+
+  // 构建完整的URL
+  const url = options.url.startsWith('http') ? options.url : BASE_URL + options.url;
+
+  // 获取token
+  const token = wx.getStorageSync('token');
+
+  // 合并默认header
+  const header = {
+    'Content-Type': 'application/json',
+    ...options.header
+  };
+
+  // 如果有token,添加到header
+  if (token) {
+    header['Authorization'] = `Bearer ${token}`;
+  }
+
   return new Promise((resolve, reject) => {
-    // 获取存储的token
-    const token = wx.getStorageSync('token') || '';
-    
-    // 合并请求头
-    const header = Object.assign(
-      {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
-      },
-      options.header || {}
-    );
-    
-    // 发起请求
     wx.request({
-      url: `${BASE_URL}${options.url}`,
+      url,
       method: options.method || 'GET',
       data: options.data,
-      header: header,
+      header,
       success: (res) => {
-        // 请求成功，但业务状态可能失败
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
-        } else if (res.statusCode === 401) {
-          // 未授权，清除token
-          wx.removeStorageSync('token');
-          reject({ message: '登录已过期，请重新登录' });
-          
-          // 跳转到登录页
-          wx.navigateTo({
-            url: '/pages/index/index'
-          });
         } else {
-          // 其他错误
-          reject({
-            statusCode: res.statusCode,
-            message: res.data.message || '请求失败'
-          });
+          // 处理特定的错误状态码
+          switch (res.statusCode) {
+            case 401:
+              // 未授权,可能需要重新登录
+              wx.removeStorageSync('token');
+              if (options.showAuthDialog) {
+                wx.showModal({
+                  title: '提示',
+                  content: '登录已过期,请重新登录',
+                  success: (res) => {
+                    if (res.confirm) {
+                      // 跳转到登录页
+                      wx.navigateTo({
+                        url: '/pages/login/index'
+                      });
+                    }
+                  }
+                });
+              }
+              break;
+            case 403:
+              wx.showToast({
+                title: '没有权限访问',
+                icon: 'none'
+              });
+              break;
+            case 404:
+              wx.showToast({
+                title: '请求的资源不存在',
+                icon: 'none'
+              });
+              break;
+            default:
+              wx.showToast({
+                title: res.data?.message || '请求失败',
+                icon: 'none'
+              });
+          }
+          reject(res);
         }
       },
-      fail: (err) => {
-        // 请求失败
-        reject({
-          message: '网络请求失败，请检查网络连接'
+      fail: (error) => {
+        wx.showToast({
+          title: '网络请求失败',
+          icon: 'none'
         });
+        reject(error);
       }
     });
   });

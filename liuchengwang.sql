@@ -11,7 +11,7 @@
  Target Server Version : 90200 (9.2.0)
  File Encoding         : 65001
 
- Date: 30/03/2025 12:57:35
+ Date: 30/03/2025 17:02:00
 */
 
 SET NAMES utf8mb4;
@@ -34,12 +34,14 @@ CREATE TABLE `deliverables` (
   PRIMARY KEY (`id`),
   KEY `FK_5d7b950eb7c657c0492fb291767` (`node_id`),
   CONSTRAINT `FK_5d7b950eb7c657c0492fb291767` FOREIGN KEY (`node_id`) REFERENCES `nodes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of deliverables
 -- ----------------------------
 BEGIN;
+INSERT INTO `deliverables` (`id`, `node_id`, `description`, `start_date`, `expected_end_date`, `duration_days`, `status`, `created_at`, `updated_at`) VALUES (25, 55, '555', '2025-03-11', '2025-03-13', 2, 'in_progress', '2025-03-30 13:13:56.964701', '2025-03-30 13:13:56.964701');
+INSERT INTO `deliverables` (`id`, `node_id`, `description`, `start_date`, `expected_end_date`, `duration_days`, `status`, `created_at`, `updated_at`) VALUES (26, 55, '33345', '2025-03-02', '2025-03-12', 10, 'in_progress', '2025-03-30 13:16:29.168341', '2025-03-30 13:16:29.168341');
 COMMIT;
 
 -- ----------------------------
@@ -59,12 +61,14 @@ CREATE TABLE `issues` (
   PRIMARY KEY (`id`),
   KEY `FK_9aa9667f91384659db19513a811` (`nodeId`),
   CONSTRAINT `FK_9aa9667f91384659db19513a811` FOREIGN KEY (`nodeId`) REFERENCES `nodes` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of issues
 -- ----------------------------
 BEGIN;
+INSERT INTO `issues` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `nodeId`, `status`) VALUES (32, '22', '2025-03-03', '2025-03-13', 10, '2025-03-30 13:16:09.149179', '2025-03-30 13:25:51.000000', 55, 'pending');
+INSERT INTO `issues` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `nodeId`, `status`) VALUES (33, '33', '2025-03-04', '2025-03-13', 9, '2025-03-30 13:16:13.497456', '2025-03-30 13:25:58.000000', 55, 'pending');
 COMMIT;
 
 -- ----------------------------
@@ -88,12 +92,13 @@ CREATE TABLE `materials` (
   PRIMARY KEY (`id`),
   KEY `FK_9c965e3f85f76bbffd21f87a44a` (`node_id`),
   CONSTRAINT `FK_9c965e3f85f76bbffd21f87a44a` FOREIGN KEY (`node_id`) REFERENCES `nodes` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of materials
 -- ----------------------------
 BEGIN;
+INSERT INTO `materials` (`id`, `node_id`, `name`, `description`, `url`, `type`, `fileSize`, `created_at`, `updated_at`, `start_date`, `expected_end_date`, `duration_days`, `status`) VALUES (29, 55, '33', '33', NULL, 'document', NULL, '2025-03-30 13:16:19.049138', '2025-03-30 13:26:09.000000', '2025-03-10', '2025-03-12', 2, 'completed');
 COMMIT;
 
 -- ----------------------------
@@ -112,14 +117,14 @@ CREATE TABLE `nodes` (
   PRIMARY KEY (`id`),
   KEY `FK_8c18b753688ef7a684395df856e` (`project_id`),
   CONSTRAINT `FK_8c18b753688ef7a684395df856e` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of nodes
 -- ----------------------------
 BEGIN;
-INSERT INTO `nodes` (`id`, `name`, `order`, `is_prerequisite`, `is_result`, `project_id`, `created_at`, `updated_at`) VALUES (54, '11', 1, 0, 0, '2657ef0d-67f6-4008-8783-0bcaf06b040e', '2025-03-30 07:47:05.259356', '2025-03-30 07:47:05.259356');
 INSERT INTO `nodes` (`id`, `name`, `order`, `is_prerequisite`, `is_result`, `project_id`, `created_at`, `updated_at`) VALUES (55, '2222', 1, 0, 0, 'bb8e02a4-a23d-4043-b749-c09daf4f7522', '2025-03-30 11:47:21.424963', '2025-03-30 11:47:21.424963');
+INSERT INTO `nodes` (`id`, `name`, `order`, `is_prerequisite`, `is_result`, `project_id`, `created_at`, `updated_at`) VALUES (56, '44', 2, 0, 0, 'bb8e02a4-a23d-4043-b749-c09daf4f7522', '2025-03-30 13:28:07.869170', '2025-03-30 13:28:07.869170');
 COMMIT;
 
 -- ----------------------------
@@ -139,15 +144,15 @@ CREATE TABLE `prerequisites` (
   PRIMARY KEY (`id`),
   KEY `FK_526fabfb01dd5f59d3b03d83d2c` (`project_id`),
   CONSTRAINT `FK_526fabfb01dd5f59d3b03d83d2c` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of prerequisites
 -- ----------------------------
 BEGIN;
-INSERT INTO `prerequisites` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `project_id`, `status`) VALUES (27, '11', '2025-03-05', '2025-03-15', 10, '2025-03-30 07:46:39.809014', '2025-03-30 07:46:39.809014', '2657ef0d-67f6-4008-8783-0bcaf06b040e', 'pending');
 INSERT INTO `prerequisites` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `project_id`, `status`) VALUES (28, '1111', NULL, NULL, NULL, '2025-03-30 11:43:38.609376', '2025-03-30 11:43:38.609376', 'bb8e02a4-a23d-4043-b749-c09daf4f7522', 'pending');
 INSERT INTO `prerequisites` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `project_id`, `status`) VALUES (29, '1112222', NULL, NULL, NULL, '2025-03-30 11:43:44.579983', '2025-03-30 11:43:44.579983', 'bb8e02a4-a23d-4043-b749-c09daf4f7522', 'pending');
+INSERT INTO `prerequisites` (`id`, `content`, `start_date`, `expected_end_date`, `duration_days`, `created_at`, `updated_at`, `project_id`, `status`) VALUES (30, '555', '2025-03-03', '2025-03-11', 8, '2025-03-30 12:59:11.594152', '2025-03-30 12:59:11.594152', 'bb8e02a4-a23d-4043-b749-c09daf4f7522', 'in_progress');
 COMMIT;
 
 -- ----------------------------
@@ -167,12 +172,14 @@ CREATE TABLE `project_users` (
   KEY `project_user_user_idx` (`user_id`),
   CONSTRAINT `fk_project_users_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_project_users_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=67 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=69 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- Records of project_users
 -- ----------------------------
 BEGIN;
+INSERT INTO `project_users` (`id`, `project_id`, `user_id`, `created_at`, `updated_at`, `can_edit`) VALUES (67, 'bdbfda95-8bb5-499b-8d85-e48650da817f', 1, '2025-03-30 14:36:01.776333', '2025-03-30 14:36:01.776333', 1);
+INSERT INTO `project_users` (`id`, `project_id`, `user_id`, `created_at`, `updated_at`, `can_edit`) VALUES (68, 'bb8e02a4-a23d-4043-b749-c09daf4f7522', 22, '2025-03-30 15:40:40.887790', '2025-03-30 15:40:40.887790', 0);
 COMMIT;
 
 -- ----------------------------
@@ -200,8 +207,8 @@ CREATE TABLE `projects` (
 -- Records of projects
 -- ----------------------------
 BEGIN;
-INSERT INTO `projects` (`id`, `password`, `deliverables`, `days_needed`, `status`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`, `results`, `created_by`) VALUES ('2657ef0d-67f6-4008-8783-0bcaf06b040e', '$2b$10$/oZ9etIToGcT5GGY0ko2y.5UknbVa8XuAWijTQ9.PoAn3rTw6PJT.', NULL, 0, 0, 'ceshi', NULL, NULL, '2025-03-30 07:46:28.333867', '2025-03-30 07:46:28.333867', NULL, NULL);
-INSERT INTO `projects` (`id`, `password`, `deliverables`, `days_needed`, `status`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`, `results`, `created_by`) VALUES ('bb8e02a4-a23d-4043-b749-c09daf4f7522', '$2b$10$8QRaT6rJpxYGQ0FnSgLRLOnZfmNCzxByNo2DmUoNGTgOr.pbtsCmK', NULL, 0, 0, '111', NULL, NULL, '2025-03-30 11:23:08.796854', '2025-03-30 11:23:08.796854', NULL, NULL);
+INSERT INTO `projects` (`id`, `password`, `deliverables`, `days_needed`, `status`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`, `results`, `created_by`) VALUES ('bb8e02a4-a23d-4043-b749-c09daf4f7522', '$2b$10$8QRaT6rJpxYGQ0FnSgLRLOnZfmNCzxByNo2DmUoNGTgOr.pbtsCmK', NULL, 0, 0, '111', NULL, NULL, '2025-03-30 11:23:08.796854', '2025-03-30 15:39:32.000000', '[{\"description\": \"1111\"}, {\"description\": \"444\"}]', NULL);
+INSERT INTO `projects` (`id`, `password`, `deliverables`, `days_needed`, `status`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`, `results`, `created_by`) VALUES ('bdbfda95-8bb5-499b-8d85-e48650da817f', '$2b$10$HhuGnpnkYBWR9tI4VKjJwOWyCpIlNKhWisdROSiy.9P4utjujXxoi', NULL, 0, 0, '555667', NULL, NULL, '2025-03-30 14:36:01.771118', '2025-03-30 14:36:01.771118', NULL, 1);
 COMMIT;
 
 -- ----------------------------
@@ -229,7 +236,7 @@ CREATE TABLE `user` (
 BEGIN;
 INSERT INTO `user` (`id`, `username`, `password`, `role`, `real_name`, `email`, `phone`, `avatar`, `created_at`, `updated_at`) VALUES (1, 'admin', '$2b$10$HKri4R8s4HjgFn8C2fnL.ecNIjCUegSkQOum7Y9vvA0eJvn8WOzDy', 'super_admin', '管理员', NULL, NULL, NULL, '2025-03-14 20:40:16.193891', '2025-03-21 11:36:18.000000');
 INSERT INTO `user` (`id`, `username`, `password`, `role`, `real_name`, `email`, `phone`, `avatar`, `created_at`, `updated_at`) VALUES (21, 'zhangsan', '$2b$10$UpoxiFTB9/AQiCrJvw1c9uyy9sz0AsvL/Kk9doNv7u5dv075JsyoS', 'employee', '张三', NULL, NULL, NULL, '2025-03-30 11:33:00.922945', '2025-03-30 11:33:00.922945');
-INSERT INTO `user` (`id`, `username`, `password`, `role`, `real_name`, `email`, `phone`, `avatar`, `created_at`, `updated_at`) VALUES (22, 'lisi', '$2b$10$EXtnq3YCadxbjnZ4txeG2Om5o5jCUEmtTUDy2jeC2upU/cIemenBW', 'employee', '李四', NULL, NULL, NULL, '2025-03-30 11:39:00.548331', '2025-03-30 11:39:00.548331');
+INSERT INTO `user` (`id`, `username`, `password`, `role`, `real_name`, `email`, `phone`, `avatar`, `created_at`, `updated_at`) VALUES (22, 'lisi', '$2b$10$EXtnq3YCadxbjnZ4txeG2Om5o5jCUEmtTUDy2jeC2upU/cIemenBW', 'project_admin', '李四', NULL, NULL, NULL, '2025-03-30 11:39:00.548331', '2025-03-30 15:41:07.000000');
 COMMIT;
 
 SET FOREIGN_KEY_CHECKS = 1;
