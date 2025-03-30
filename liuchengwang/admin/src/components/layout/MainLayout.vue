@@ -20,12 +20,32 @@ const menuItems = computed(() => {
   const mainRoute = router.options.routes?.find(route => route.path === '/');
   const items = mainRoute?.children?.filter(item => !item.meta?.hideInMenu) || [];
   
-  // 确保项目管理菜单项使用绝对路径
-  return items.map(item => {
+  // 获取用户角色
+  const userInfoStr = localStorage.getItem('userInfo');
+  const userRole = userInfoStr ? JSON.parse(userInfoStr).role : null;
+  
+  // 过滤菜单项
+  return items.filter(item => {
+    // 如果菜单项没有角色要求，则所有人都可以看到
+    if (!item.meta?.requiredRoles) {
+      return true;
+    }
+    
+    // 如果菜单项有角色要求，检查用户角色是否满足要求
+    return item.meta.requiredRoles.includes(userRole);
+  }).map(item => {
+    // 项目管理使用绝对路径
     if (item.path === 'projects') {
       return {
         ...item,
-        path: '/projects', // 使用绝对路径
+        path: '/projects',
+      };
+    }
+    // 项目分配使用绝对路径
+    if (item.path === 'project-assign') {
+      return {
+        ...item,
+        path: '/project-assign',
       };
     }
     return item;
@@ -38,6 +58,9 @@ const activeMenu = computed(() => {
   // 使用includes而不是startsWith，更灵活地匹配路径
   if (path.includes('/projects') || path.includes('/nodes')) {
     return '/projects';
+  }
+  if (path.includes('/project-assign')) {
+    return '/project-assign';
   }
   return path;
 });
@@ -53,6 +76,32 @@ const handleMenuSelect = async (index: string) => {
       
       // 强制使用绝对路径导航
       window.location.href = '/projects';
+      return;
+    }
+    
+    // 如果点击的是项目分配菜单
+    if (index === '/project-assign') {
+      console.log('检测到项目分配菜单点击，使用router导航');
+      console.log('导航前路由状态:', router.currentRoute.value.fullPath);
+      
+      try {
+        // 使用命名路由导航
+        await router.push({ name: 'ProjectAssign' });
+        console.log('使用命名路由导航完成，当前路径:', router.currentRoute.value.fullPath);
+      } catch (navError) {
+        console.error('命名路由导航失败:', navError);
+        
+        try {
+          // 尝试使用路径导航
+          await router.push('/project-assign');
+          console.log('路径导航完成，当前路径:', router.currentRoute.value.fullPath);
+        } catch (pathError) {
+          console.error('路径导航也失败:', pathError);
+          // 最后尝试使用window.location作为备选方案
+          console.log('尝试使用window.location重定向');
+          window.location.href = '/project-assign';
+        }
+      }
       return;
     }
     

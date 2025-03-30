@@ -1,6 +1,6 @@
 <template>
   <div class="node-descriptions-wrapper">
-    <div v-for="(_, index) in descriptions" :key="index" class="description-item-container">
+    <div v-for="(desc, index) in descriptions" :key="index" class="description-item-container">
       <el-input
         v-model="descriptions[index]"
         type="textarea"

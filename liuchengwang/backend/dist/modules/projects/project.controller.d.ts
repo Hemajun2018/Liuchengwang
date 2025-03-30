@@ -6,20 +6,22 @@ export declare class ProjectController {
     create(createProjectDto: {
         name: string;
         password: string;
-    }): Promise<Project>;
+    }, req: any): Promise<Project>;
     findAll(query: {
         page?: string;
         pageSize?: string;
         keyword?: string;
         status?: string;
-    }): Promise<{
+    }, req: any): Promise<{
         items: Project[];
         total: number;
     }>;
     findOne(id: string): Promise<Project>;
     update(id: string, updateProjectDto: Partial<Project>): Promise<Project>;
     remove(id: string): Promise<Project>;
-    verifyProject(verifyDto: {
+    cloneProject(id: string, newProjectName: string): Promise<Project>;
+    copyProject(id: string, newProjectName: string): Promise<Project>;
+    verifyProject(data: {
         name: string;
         password: string;
     }): Promise<Project>;

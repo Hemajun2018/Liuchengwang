@@ -1,4 +1,5 @@
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -20,66 +21,73 @@ Page({
   },
   
   // 加载项目信息
-  loadProjectInfo() {
+  async loadProjectInfo() {
     this.setData({ loading: true });
     
-    // 先尝试从本地获取
-    const projectInfo = wx.getStorageSync('projectInfo');
-    
-    if (projectInfo && projectInfo.id === this.data.projectId) {
-      console.log('从本地获取的项目信息:', projectInfo);
+    try {
+      // 使用封装的request方法获取项目信息
+      const projectData = await request({
+        url: `/projects/${this.data.projectId}`,
+        method: 'GET'
+      });
+      
+      console.log('从服务器获取的项目信息:', projectData);
       
       // 确保数据格式正确
-      const processedInfo = this.processProjectInfo(projectInfo);
+      const processedInfo = this.processProjectInfo(projectData);
       
-      // 预先格式化时间和状态
-      const formattedStartTime = this.formatDate(processedInfo.start_time);
-      const formattedEndTime = this.formatDate(processedInfo.end_time);
-      const statusText = this.getStatusText(processedInfo.status);
-      
-      console.log('预先格式化的开始时间:', formattedStartTime);
-      console.log('预先格式化的结束时间:', formattedEndTime);
-      console.log('预先格式化的状态文本:', statusText);
+      // 更新本地存储
+      wx.setStorageSync('projectInfo', processedInfo);
       
       this.setData({ 
         projectInfo: processedInfo,
         loading: false
       });
-    } else {
-      // 如果本地没有，则从服务器获取
-      wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
-        method: 'GET',
-        success: (res) => {
-          if (res.statusCode === 200) {
-            const projectData = res.data;
-            console.log('从服务器获取的项目信息:', projectData);
-            
-            // 确保数据格式正确
-            const processedInfo = this.processProjectInfo(projectData);
-            
-            this.setData({ 
-              projectInfo: processedInfo,
-              loading: false
-            });
-          } else {
-            wx.showToast({
-              title: '获取项目信息失败',
-              icon: 'none'
-            });
-            this.setData({ loading: false });
-          }
-        },
-        fail: (err) => {
-          console.error('请求项目信息失败:', err);
-          wx.showToast({
-            title: '网络请求失败',
-            icon: 'none'
-          });
-          this.setData({ loading: false });
-        }
+    } catch (err) {
+      console.error('请求项目信息失败:', err);
+      wx.showToast({
+        title: '获取项目信息失败',
+        icon: 'none'
       });
+      this.setData({ loading: false });
     }
+  },
+  
+  // 加载成果列表
+  loadResultsList(projectInfo) {
+    // 检查项目信息中是否已包含成果列表
+    if (projectInfo.results && projectInfo.results.length > 0) {
+      console.log('项目信息中已包含成果列表:', projectInfo.results);
+      return;
+    }
+    
+    // 尝试从服务器获取成果列表
+    console.log('尝试从服务器获取成果列表...');
+    wx.request({
+      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/results`,
+      method: 'GET',
+      success: (res) => {
+        if (res.statusCode === 200) {
+          const results = res.data || [];
+          console.log('从服务器获取的成果列表:', results);
+          
+          // 更新项目信息中的成果列表
+          const updatedProjectInfo = { ...this.data.projectInfo, results };
+          
+          this.setData({ 
+            projectInfo: updatedProjectInfo
+          });
+          
+          // 更新本地存储
+          wx.setStorageSync('projectInfo', updatedProjectInfo);
+        } else {
+          console.error('获取成果列表失败:', res);
+        }
+      },
+      fail: (err) => {
+        console.error('请求成果列表失败:', err);
+      }
+    });
   },
   
   // 格式化日期
@@ -160,12 +168,10 @@ Page({
     
     // 确保日期字段存在且格式正确
     if (processedInfo.start_time) {
-      // 不需要转换为Date对象，直接使用字符串
       console.log('处理后的开始时间:', processedInfo.start_time);
     }
     
     if (processedInfo.end_time) {
-      // 不需要转换为Date对象，直接使用字符串
       console.log('处理后的结束时间:', processedInfo.end_time);
     }
     
@@ -175,6 +181,88 @@ Page({
       console.log('处理后的状态:', processedInfo.status);
     }
     
+    // 确保results字段存在
+    if (!processedInfo.results) {
+      processedInfo.results = [];
+    }
+    
     return processedInfo;
+  },
+  
+  // 添加新成果
+  async addNewResult() {
+    // 获取当前时间
+    const now = new Date();
+    const dateStr = this.formatDate(now);
+    
+    // 创建新成果对象
+    const newResult = {
+      description: `新增成果项 ${dateStr}`,
+      created_at: dateStr
+    };
+    
+    try {
+      // 获取当前成果列表
+      const currentResults = this.data.projectInfo.results || [];
+      
+      // 将新成果添加到列表中
+      const updatedResults = [...currentResults, newResult];
+      
+      // 调用后端API更新项目成果
+      await request({
+        url: `/projects/${this.data.projectId}`,
+        method: 'PATCH',
+        data: {
+          results: updatedResults
+        }
+      });
+      
+      // 更新项目信息
+      const updatedProjectInfo = { ...this.data.projectInfo, results: updatedResults };
+      
+      // 更新页面数据
+      this.setData({ 
+        projectInfo: updatedProjectInfo
+      });
+      
+      // 更新本地存储
+      wx.setStorageSync('projectInfo', updatedProjectInfo);
+      
+      // 显示成功提示
+      wx.showToast({
+        title: '成果添加成功',
+        icon: 'success'
+      });
+    } catch (err) {
+      console.error('添加成果失败:', err);
+      wx.showToast({
+        title: '添加成果失败',
+        icon: 'none'
+      });
+    }
+  },
+  
+  // 刷新成果列表
+  refreshResults() {
+    wx.showLoading({
+      title: '刷新中...',
+    });
+    
+    // 重新加载项目信息
+    this.loadProjectInfo().finally(() => {
+      wx.hideLoading();
+    });
+  },
+  
+  // 页面相关生命周期函数
+  onPullDownRefresh() {
+    // 下拉刷新
+    this.refreshResults();
+    wx.stopPullDownRefresh();
+  },
+  
+  onShow() {
+    // 页面显示时刷新数据
+    this.loadProjectInfo();
   }
 }); 

@@ -18,11 +18,19 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const project_entity_1 = require("../../database/entities/project.entity");
 const bcrypt = require("bcrypt");
+const node_entity_1 = require("../../database/entities/node.entity");
+const issue_entity_1 = require("../../database/entities/issue.entity");
+const material_entity_1 = require("../../database/entities/material.entity");
+const deliverable_entity_1 = require("../../database/entities/deliverable.entity");
+const project_user_entity_1 = require("../../database/entities/project-user.entity");
+const user_entity_1 = require("../../database/entities/user.entity");
+const typeorm_3 = require("typeorm");
 let ProjectService = class ProjectService {
-    constructor(projectRepository) {
+    constructor(projectRepository, projectUserRepository) {
         this.projectRepository = projectRepository;
+        this.projectUserRepository = projectUserRepository;
     }
-    async create(createProjectDto) {
+    async create(createProjectDto, currentUser) {
         console.log('创建项目请求数据:', createProjectDto);
         const existingProject = await this.projectRepository.findOne({
             where: { name: createProjectDto.name }
@@ -31,16 +39,30 @@ let ProjectService = class ProjectService {
             console.log('项目名称已存在:', existingProject);
             throw new common_1.ConflictException('项目名称已存在');
         }
-        const project = this.projectRepository.create({
+        const projectData = {
             name: createProjectDto.name,
             password: await bcrypt.hash(createProjectDto.password, 10),
             status: project_entity_1.ProjectStatus.NOT_STARTED,
-            days_needed: 0
-        });
+            days_needed: 0,
+            created_by: currentUser?.id ? Number(currentUser.id) : null
+        };
+        const project = this.projectRepository.create(projectData);
         console.log('准备保存的项目数据:', project);
         try {
             const savedProject = await this.projectRepository.save(project);
             console.log('保存成功，返回数据:', savedProject);
+            if (currentUser && currentUser.id) {
+                try {
+                    await this.projectUserRepository.save({
+                        project_id: savedProject.id,
+                        user_id: currentUser.id,
+                        can_edit: true
+                    });
+                }
+                catch (error) {
+                    console.error('创建项目用户关联失败:', error);
+                }
+            }
             return savedProject;
         }
         catch (error) {
@@ -49,29 +71,74 @@ let ProjectService = class ProjectService {
         }
     }
     async findAll(params) {
-        console.log('开始查询项目列表, 参数:', params);
-        const queryBuilder = this.projectRepository.createQueryBuilder('project');
-        if (params?.keyword) {
-            queryBuilder.andWhere('project.name LIKE :keyword', { keyword: `%${params.keyword}%` });
+        try {
+            const { page = 1, pageSize = 10, keyword, status, user } = params || {};
+            console.log('开始查询项目列表，用户信息:', {
+                用户ID: user?.id,
+                用户角色: user?.role
+            });
+            const queryBuilder = this.projectRepository
+                .createQueryBuilder('project')
+                .select([
+                'project.id',
+                'project.name',
+                'project.status',
+                'project.deliverables',
+                'project.start_time',
+                'project.end_time',
+                'project.days_needed',
+                'project.created_at',
+                'project.updated_at',
+                'project.created_by'
+            ]);
+            if (user && user.role !== user_entity_1.UserRole.SUPER_ADMIN) {
+                queryBuilder
+                    .leftJoin('project.projectUsers', 'projectUser')
+                    .where(new typeorm_3.Brackets(qb => {
+                    qb.where('project.created_by = :userId', { userId: Number(user.id) })
+                        .orWhere('projectUser.user_id = :userId', { userId: Number(user.id) });
+                }))
+                    .distinct(true);
+                const [sql, parameters] = queryBuilder.getQueryAndParameters();
+                console.log('SQL查询:', sql);
+                console.log('SQL参数:', parameters);
+            }
+            if (keyword) {
+                queryBuilder.andWhere('project.name LIKE :keyword', { keyword: `%${keyword}%` });
+            }
+            if (status) {
+                queryBuilder.andWhere('project.status = :status', { status });
+            }
+            const total = await queryBuilder.getCount();
+            const items = await queryBuilder
+                .orderBy('project.created_at', 'DESC')
+                .skip((page - 1) * pageSize)
+                .take(pageSize)
+                .getMany();
+            console.log('查询结果:', {
+                总数: total,
+                当前页数据量: items.length,
+                查询条件: {
+                    keyword,
+                    status,
+                    page,
+                    pageSize
+                },
+                项目列表: items.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    created_by: item.created_by ? Number(item.created_by) : null
+                }))
+            });
+            return {
+                items,
+                total
+            };
         }
-        if (params?.status) {
-            queryBuilder.andWhere('project.status = :status', { status: params.status });
+        catch (error) {
+            console.error('获取项目列表失败:', error);
+            throw error;
         }
-        const page = params?.page || 1;
-        const pageSize = params?.pageSize || 10;
-        const skip = (page - 1) * pageSize;
-        queryBuilder
-            .select(['project.id', 'project.name', 'project.status'])
-            .orderBy('project.created_at', 'DESC')
-            .skip(skip)
-            .take(pageSize);
-        const [projects, total] = await queryBuilder.getManyAndCount();
-        console.log('查询到的项目列表:', projects);
-        console.log('项目总数:', total);
-        return {
-            items: projects,
-            total
-        };
     }
     async findOne(id) {
         console.log('查询单个项目，ID:', id);
@@ -115,10 +182,18 @@ let ProjectService = class ProjectService {
     }
     async remove(id) {
         console.log('删除项目，ID:', id);
-        const project = await this.findOne(id);
-        const result = await this.projectRepository.remove(project);
-        console.log('删除成功，返回数据:', result);
-        return result;
+        try {
+            const project = await this.findOne(id);
+            const deletePrerequisitesResult = await this.projectRepository.manager.query(`DELETE FROM prerequisites WHERE project_id = ?`, [id]);
+            console.log('删除前置条件结果:', deletePrerequisitesResult);
+            const result = await this.projectRepository.remove(project);
+            console.log('项目删除成功，返回数据:', result);
+            return result;
+        }
+        catch (error) {
+            console.error('删除项目失败:', error);
+            throw error;
+        }
     }
     async verifyProject(name, password) {
         console.log('验证项目密码，项目名:', name);
@@ -180,11 +255,88 @@ let ProjectService = class ProjectService {
             throw error;
         }
     }
+    async copyProject(sourceId, newProjectName) {
+        return await this.projectRepository.manager.transaction(async (manager) => {
+            const sourceProject = await manager.findOne(project_entity_1.Project, {
+                where: { id: sourceId },
+                relations: ['nodes', 'nodes.issues', 'nodes.materials', 'nodes.deliverables']
+            });
+            if (!sourceProject) {
+                throw new common_1.NotFoundException('源项目不存在');
+            }
+            const existingProject = await manager.findOne(project_entity_1.Project, {
+                where: { name: newProjectName }
+            });
+            if (existingProject) {
+                throw new common_1.ConflictException('项目名称已存在');
+            }
+            const newProject = manager.create(project_entity_1.Project, {
+                ...sourceProject,
+                id: undefined,
+                name: newProjectName,
+                password: sourceProject.password,
+                created_at: new Date(),
+                updated_at: new Date(),
+                status: project_entity_1.ProjectStatus.NOT_STARTED,
+                days_needed: sourceProject.days_needed,
+                created_by: sourceProject.created_by ? Number(sourceProject.created_by) : null
+            });
+            const savedProject = await manager.save(project_entity_1.Project, newProject);
+            if (sourceProject.nodes) {
+                for (const sourceNode of sourceProject.nodes) {
+                    const newNode = manager.create(node_entity_1.Node, {
+                        ...sourceNode,
+                        id: undefined,
+                        projectId: savedProject.id,
+                        created_at: new Date(),
+                        updated_at: new Date()
+                    });
+                    const savedNode = await manager.save(node_entity_1.Node, newNode);
+                    if (sourceNode.issues) {
+                        for (const issue of sourceNode.issues) {
+                            await manager.save(issue_entity_1.Issue, {
+                                ...issue,
+                                id: undefined,
+                                nodeId: savedNode.id,
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                        }
+                    }
+                    if (sourceNode.materials) {
+                        for (const material of sourceNode.materials) {
+                            await manager.save(material_entity_1.Material, {
+                                ...material,
+                                id: undefined,
+                                nodeId: savedNode.id,
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                        }
+                    }
+                    if (sourceNode.deliverables) {
+                        for (const deliverable of sourceNode.deliverables) {
+                            await manager.save(deliverable_entity_1.Deliverable, {
+                                ...deliverable,
+                                id: undefined,
+                                nodeId: savedNode.id,
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                        }
+                    }
+                }
+            }
+            return savedProject;
+        });
+    }
 };
 exports.ProjectService = ProjectService;
 exports.ProjectService = ProjectService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(project_entity_1.Project)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(1, (0, typeorm_1.InjectRepository)(project_user_entity_1.ProjectUser)),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository])
 ], ProjectService);
 //# sourceMappingURL=project.service.js.map

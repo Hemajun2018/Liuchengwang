@@ -21,6 +21,7 @@ export declare class UsersService {
         pageSize: number;
         keyword?: string;
         role?: string;
+        roles?: UserRole[];
     }): Promise<{
         items: {
             id: number;
@@ -32,11 +33,14 @@ export declare class UsersService {
             avatar?: string;
             createdAt: Date;
             updatedAt: Date;
+            projectUsers: import("../../database/entities/project-user.entity").ProjectUser[];
         }[];
         total: number;
     }>;
     update(id: number, updateUserDto: UpdateUserDto): Promise<User>;
     remove(id: number): Promise<void>;
     updatePassword(id: number, updatePasswordDto: UpdatePasswordDto): Promise<void>;
-    updateRole(id: number, role: string): Promise<User>;
+    updateRole(id: number, role: UserRole): Promise<User>;
+    initSuperAdmin(): Promise<void>;
+    createTestUsers(): Promise<void>;
 }

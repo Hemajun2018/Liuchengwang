@@ -25,7 +25,6 @@ export declare class NodeService {
         expected_end_date?: string | null;
         duration_days?: number | null;
     }): Promise<Issue>;
-    getIssues(projectId: string, nodeId: number): Promise<Issue[]>;
     updateIssue(projectId: string, nodeId: number, issueId: number, updateIssueDto: {
         content?: string;
         status?: string;
@@ -33,6 +32,9 @@ export declare class NodeService {
         expected_end_date?: string | null;
         duration_days?: number | null;
     }): Promise<Issue>;
+    private isValidDateString;
+    private calculateDuration;
+    getIssues(projectId: string, nodeId: number): Promise<Issue[]>;
     deleteIssue(projectId: string, nodeId: number, issueId: number): Promise<void>;
     createMaterial(projectId: string, nodeId: number, createMaterialDto: CreateMaterialDto): Promise<Material>;
     getMaterials(projectId: string, nodeId: number): Promise<Material[]>;

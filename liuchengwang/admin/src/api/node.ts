@@ -1,5 +1,4 @@
 import request from '../utils/request';
-import type { Deliverable } from './deliverable';
 
 export enum NodeStatus {
   NOT_STARTED = 'not_started',
@@ -40,11 +39,6 @@ export interface Node {
   issues: Issue[];
   materials: Material[];
   deliverables: any[];
-  progresses: {
-    id: number;
-    description: string;
-    created_at: Date;
-  }[];
 }
 
 export interface Issue {
@@ -57,6 +51,11 @@ export interface Issue {
   duration_days: number | null;
   created_at: Date;
   updated_at: Date;
+  
+  // 为兼容前端代码添加别名字段
+  startDate?: string | null;
+  endDate?: string | null;
+  durationDays?: number | null;
 }
 
 export interface Material {
@@ -186,7 +185,19 @@ export const getIssueList = (projectId: string, nodeId: number): Promise<Issue[]
   return request({
     url: `/projects/${projectId}/nodes/${nodeId}/issues`,
     method: 'get'
-  }).then(response => response.data);
+  }).then(response => {
+    const issues = response.data;
+    
+    // 处理问题字段映射，确保前端代码兼容性
+    issues.forEach((issue: Issue) => {
+      // 添加别名字段
+      issue.startDate = issue.start_date;
+      issue.endDate = issue.expected_end_date;
+      issue.durationDays = issue.duration_days;
+    });
+    
+    return issues;
+  });
 };
 
 /**

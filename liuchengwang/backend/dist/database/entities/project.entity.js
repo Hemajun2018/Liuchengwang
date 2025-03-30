@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Project = exports.ProjectStatus = void 0;
 const typeorm_1 = require("typeorm");
 const node_entity_1 = require("./node.entity");
+const project_user_entity_1 = require("./project-user.entity");
 var ProjectStatus;
 (function (ProjectStatus) {
     ProjectStatus[ProjectStatus["NOT_STARTED"] = 0] = "NOT_STARTED";
@@ -59,6 +60,10 @@ __decorate([
     __metadata("design:type", Array)
 ], Project.prototype, "results", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'int', nullable: true }),
+    __metadata("design:type", Number)
+], Project.prototype, "created_by", void 0);
+__decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], Project.prototype, "created_at", void 0);
@@ -70,6 +75,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => node_entity_1.Node, node => node.project),
     __metadata("design:type", Array)
 ], Project.prototype, "nodes", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => project_user_entity_1.ProjectUser, projectUser => projectUser.project),
+    __metadata("design:type", Array)
+], Project.prototype, "projectUsers", void 0);
 exports.Project = Project = __decorate([
     (0, typeorm_1.Entity)('projects')
 ], Project);

@@ -32,14 +32,7 @@ let NodeService = NodeService_1 = class NodeService {
         this.logger.log(`项目ID: ${projectId}`);
         this.logger.log(`节点数据: ${JSON.stringify(data, null, 2)}`);
         try {
-            if (data.startTime && data.endTime) {
-                const start = new Date(data.startTime);
-                const end = new Date(data.endTime);
-                const diffTime = Math.abs(end.getTime() - start.getTime());
-                const daysNeeded = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                this.logger.log(`自动计算所需天数: ${daysNeeded}`);
-            }
-            const node = this.nodeRepository.create({
+            const node = await this.nodeRepository.create({
                 projectId,
                 name: data.name,
                 order: data.order,
@@ -63,12 +56,56 @@ let NodeService = NodeService_1 = class NodeService {
         this.logger.log('=== 节点服务：开始获取节点列表 ===');
         this.logger.log(`项目ID: ${projectId}`);
         try {
-            const nodes = await this.nodeRepository.find({
-                where: { projectId },
-                order: { order: 'ASC' },
-                relations: ['issues', 'materials'],
-            });
+            const nodes = await this.nodeRepository
+                .createQueryBuilder('node')
+                .select([
+                'node.id',
+                'node.projectId',
+                'node.name',
+                'node.order',
+                'node.isPrerequisite',
+                'node.isResult',
+                'node.createdAt',
+                'node.updatedAt',
+                'issues.id',
+                'issues.content',
+                'issues.status',
+                'issues.start_date',
+                'issues.expected_end_date',
+                'issues.duration_days',
+                'issues.created_at',
+                'issues.updated_at',
+                'materials.id',
+                'materials.name',
+                'materials.description',
+                'materials.url',
+                'materials.type',
+                'materials.fileSize',
+                'materials.start_date',
+                'materials.expected_end_date',
+                'materials.duration_days',
+                'materials.status',
+                'materials.created_at',
+                'materials.updated_at',
+                'deliverables.id',
+                'deliverables.description',
+                'deliverables.start_date',
+                'deliverables.expected_end_date',
+                'deliverables.duration_days',
+                'deliverables.status',
+                'deliverables.created_at',
+                'deliverables.updated_at'
+            ])
+                .leftJoin('node.issues', 'issues')
+                .leftJoin('node.materials', 'materials')
+                .leftJoin('node.deliverables', 'deliverables')
+                .where('node.projectId = :projectId', { projectId })
+                .orderBy('node.order', 'ASC')
+                .getMany();
             this.logger.log(`获取到 ${nodes.length} 个节点`);
+            nodes.forEach(node => {
+                this.logger.debug(`节点 ${node.id} (${node.name}) 的交付内容数量: ${node.deliverables?.length || 0}`);
+            });
             this.logger.log(`节点列表: ${JSON.stringify(nodes, null, 2)}`);
             this.logger.log('=== 节点服务：节点列表获取完成 ===\n');
             return nodes;
@@ -81,26 +118,67 @@ let NodeService = NodeService_1 = class NodeService {
         }
     }
     async findOne(projectId, id) {
-        this.logger.log('=== 节点服务：开始获取单个节点 ===');
-        this.logger.log(`项目ID: ${projectId}, 节点ID: ${id}`);
+        this.logger.log(`查询单个节点, 项目ID: ${projectId}, 节点ID: ${id}`);
         try {
-            const node = await this.nodeRepository.findOne({
-                where: { projectId, id },
-                relations: ['issues', 'materials'],
-            });
+            const node = await this.nodeRepository
+                .createQueryBuilder('node')
+                .select([
+                'node.id',
+                'node.projectId',
+                'node.name',
+                'node.order',
+                'node.isPrerequisite',
+                'node.isResult',
+                'node.createdAt',
+                'node.updatedAt',
+                'issues.id',
+                'issues.content',
+                'issues.status',
+                'issues.start_date',
+                'issues.expected_end_date',
+                'issues.duration_days',
+                'issues.created_at',
+                'issues.updated_at',
+                'materials.id',
+                'materials.name',
+                'materials.description',
+                'materials.url',
+                'materials.type',
+                'materials.fileSize',
+                'materials.start_date',
+                'materials.expected_end_date',
+                'materials.duration_days',
+                'materials.status',
+                'materials.created_at',
+                'materials.updated_at',
+                'deliverables.id',
+                'deliverables.description',
+                'deliverables.start_date',
+                'deliverables.expected_end_date',
+                'deliverables.duration_days',
+                'deliverables.status',
+                'deliverables.created_at',
+                'deliverables.updated_at'
+            ])
+                .leftJoin('node.issues', 'issues')
+                .leftJoin('node.materials', 'materials')
+                .leftJoin('node.deliverables', 'deliverables')
+                .where('node.projectId = :projectId', { projectId })
+                .andWhere('node.id = :id', { id })
+                .getOne();
             if (!node) {
-                this.logger.warn('未找到指定节点');
-                this.logger.log('=== 节点服务：节点获取完成 ===\n');
-                return null;
+                this.logger.error(`节点不存在, 项目ID: ${projectId}, 节点ID: ${id}`);
+                throw new common_1.NotFoundException(`节点 #${id} 不存在`);
             }
-            this.logger.log(`获取到节点: ${JSON.stringify(node, null, 2)}`);
-            this.logger.log('=== 节点服务：节点获取完成 ===\n');
+            this.logger.debug(`找到节点: ${node.id} (${node.name})`);
+            this.logger.debug(`节点的交付内容数量: ${node.deliverables?.length || 0}`);
+            if (node.deliverables && node.deliverables.length > 0) {
+                this.logger.debug(`节点的第一个交付内容: ${JSON.stringify(node.deliverables[0])}`);
+            }
             return node;
         }
         catch (error) {
-            this.logger.error(`获取节点失败: ${error.message}`);
-            this.logger.error(`错误堆栈: ${error.stack}`);
-            this.logger.error('=== 节点服务：节点获取异常 ===\n');
+            this.logger.error(`查询单个节点失败: ${error.message}`, error.stack);
             throw error;
         }
     }
@@ -187,9 +265,12 @@ let NodeService = NodeService_1 = class NodeService {
         this.logger.log('=== 开始保存问题 ===');
         this.logger.log(`项目ID: ${projectId}, 节点ID: ${nodeId}`);
         this.logger.log(`创建数据: ${JSON.stringify(createIssueDto, null, 2)}`);
-        const node = await this.nodeRepository.findOne({
-            where: { id: nodeId, project: { id: projectId } },
-        });
+        const node = await this.nodeRepository
+            .createQueryBuilder('node')
+            .select(['node.id', 'node.projectId'])
+            .where('node.id = :nodeId', { nodeId })
+            .andWhere('node.projectId = :projectId', { projectId })
+            .getOne();
         if (!node) {
             throw new Error('节点不存在');
         }
@@ -213,30 +294,6 @@ let NodeService = NodeService_1 = class NodeService {
         const savedIssue = await this.issueRepository.save(issue);
         this.logger.log(`问题保存成功: ${JSON.stringify(savedIssue, null, 2)}`);
         return savedIssue;
-    }
-    async getIssues(projectId, nodeId) {
-        this.logger.log('=== 节点服务：开始获取问题列表 ===');
-        this.logger.log(`项目ID: ${projectId}, 节点ID: ${nodeId}`);
-        try {
-            const node = await this.findOne(projectId, nodeId);
-            if (!node) {
-                throw new Error('节点不存在');
-            }
-            const issues = await this.issueRepository.find({
-                where: { node: { id: nodeId } },
-                order: { created_at: 'DESC' },
-            });
-            this.logger.log(`获取到 ${issues.length} 个问题`);
-            this.logger.log(`问题列表: ${JSON.stringify(issues, null, 2)}`);
-            this.logger.log('=== 节点服务：问题列表获取完成 ===\n');
-            return issues;
-        }
-        catch (error) {
-            this.logger.error(`获取问题列表失败: ${error.message}`);
-            this.logger.error(`错误堆栈: ${error.stack}`);
-            this.logger.error('=== 节点服务：问题列表获取异常 ===\n');
-            throw error;
-        }
     }
     async updateIssue(projectId, nodeId, issueId, updateIssueDto) {
         this.logger.log('=== 开始更新问题 ===');
@@ -270,6 +327,45 @@ let NodeService = NodeService_1 = class NodeService {
         const updatedIssue = await this.issueRepository.save(issue);
         this.logger.log(`问题更新成功: ${JSON.stringify(updatedIssue, null, 2)}`);
         return updatedIssue;
+    }
+    isValidDateString(dateStr) {
+        const regex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!regex.test(dateStr))
+            return false;
+        const date = new Date(dateStr);
+        return date instanceof Date && !isNaN(date.getTime());
+    }
+    calculateDuration(startDate, endDate) {
+        if (!startDate || !endDate)
+            return null;
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    async getIssues(projectId, nodeId) {
+        this.logger.log('=== 节点服务：开始获取问题列表 ===');
+        this.logger.log(`项目ID: ${projectId}, 节点ID: ${nodeId}`);
+        try {
+            const node = await this.findOne(projectId, nodeId);
+            if (!node) {
+                throw new Error('节点不存在');
+            }
+            const issues = await this.issueRepository.find({
+                where: { node: { id: nodeId } },
+                order: { created_at: 'DESC' },
+            });
+            this.logger.log(`获取到 ${issues.length} 个问题`);
+            this.logger.log(`问题列表: ${JSON.stringify(issues, null, 2)}`);
+            this.logger.log('=== 节点服务：问题列表获取完成 ===\n');
+            return issues;
+        }
+        catch (error) {
+            this.logger.error(`获取问题列表失败: ${error.message}`);
+            this.logger.error(`错误堆栈: ${error.stack}`);
+            this.logger.error('=== 节点服务：问题列表获取异常 ===\n');
+            throw error;
+        }
     }
     async deleteIssue(projectId, nodeId, issueId) {
         this.logger.log('=== 节点服务：开始删除问题 ===');
@@ -373,14 +469,13 @@ let NodeService = NodeService_1 = class NodeService {
         try {
             const node = await this.findOne(projectId, nodeId);
             if (!node) {
-                throw new Error('节点不存在');
+                throw new common_1.NotFoundException(`节点 #${nodeId} 不存在`);
             }
             const material = await this.materialRepository.findOne({
                 where: { id: materialId, node: { id: nodeId } },
             });
             if (!material) {
-                this.logger.warn('未找到指定材料');
-                return null;
+                throw new common_1.NotFoundException(`材料 #${materialId} 不存在`);
             }
             this.logger.log(`获取到材料: ${JSON.stringify(material, null, 2)}`);
             this.logger.log('=== 材料获取完成 ===\n');
@@ -400,13 +495,13 @@ let NodeService = NodeService_1 = class NodeService {
         try {
             const node = await this.findOne(projectId, nodeId);
             if (!node) {
-                throw new Error('节点不存在');
+                throw new common_1.NotFoundException(`节点 #${nodeId} 不存在`);
             }
             const material = await this.materialRepository.findOne({
                 where: { id: materialId, node: { id: nodeId } },
             });
             if (!material) {
-                throw new Error('材料不存在');
+                throw new common_1.NotFoundException(`材料 #${materialId} 不存在`);
             }
             if (updateMaterialDto.name !== undefined) {
                 material.name = updateMaterialDto.name;
@@ -457,17 +552,17 @@ let NodeService = NodeService_1 = class NodeService {
         try {
             const node = await this.findOne(projectId, nodeId);
             if (!node) {
-                throw new Error('节点不存在');
+                throw new common_1.NotFoundException(`节点 #${nodeId} 不存在`);
             }
             const material = await this.materialRepository.findOne({
                 where: { id: materialId, node: { id: nodeId } },
             });
             if (!material) {
-                throw new Error('材料不存在');
+                throw new common_1.NotFoundException(`材料 #${materialId} 不存在`);
             }
             const deleteResult = await this.materialRepository.delete(materialId);
             if (deleteResult.affected === 0) {
-                throw new Error('材料删除失败');
+                throw new common_1.NotFoundException(`材料 #${materialId} 删除失败`);
             }
             this.logger.log('材料删除成功');
             this.logger.log('=== 材料删除完成 ===\n');

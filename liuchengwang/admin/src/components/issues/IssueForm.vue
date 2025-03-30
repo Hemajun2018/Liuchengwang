@@ -26,12 +26,31 @@ const emit = defineEmits<{
 
 const formRef = ref<FormInstance>();
 const form = ref({
-  content: props.initialData?.content || '',
-  status: props.initialData?.status || IssueStatus.PENDING,
-  start_date: props.initialData?.startDate || null,
-  expected_end_date: props.initialData?.endDate || null,
-  duration_days: props.initialData?.durationDays || null
+  content: '',
+  status: IssueStatus.PENDING,
+  start_date: null as string | null,
+  expected_end_date: null as string | null,
+  duration_days: null as number | null
 });
+
+// 重置表单为初始状态或根据props更新表单
+const resetForm = () => {
+  form.value = {
+    content: props.initialData?.content || '',
+    status: props.initialData?.status || IssueStatus.PENDING,
+    start_date: props.initialData?.startDate || null,
+    expected_end_date: props.initialData?.endDate || null,
+    duration_days: props.initialData?.durationDays || null
+  };
+};
+
+// 初始化表单
+resetForm();
+
+// 监听props变化，重置表单
+watch(() => props.initialData, (newVal) => {
+  resetForm();
+}, { deep: true });
 
 // 表单验证规则
 const rules = {

@@ -5,33 +5,8 @@ export class CreateNodeDto {
   @IsString()
   name: string;
 
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  descriptions?: string[];
-
   @IsNumber()
   order: number;
-
-  @IsEnum(NodeStatus)
-  @IsOptional()
-  status?: NodeStatus;
-
-  @IsDateString()
-  @IsOptional()
-  startTime?: Date;
-
-  @IsDateString()
-  @IsOptional()
-  endTime?: Date;
-
-  @IsDateString()
-  @IsOptional()
-  expectedEndDate?: Date;
 
   @IsBoolean()
   @IsOptional()

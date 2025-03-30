@@ -91,7 +91,7 @@ let UsersService = class UsersService {
         });
     }
     async findAll(params) {
-        const { page, pageSize, keyword, role } = params;
+        const { page, pageSize, keyword, role, roles } = params;
         const skip = (page - 1) * pageSize;
         const queryBuilder = this.userRepository.createQueryBuilder('user');
         if (keyword) {
@@ -100,7 +100,12 @@ let UsersService = class UsersService {
         if (role) {
             queryBuilder.andWhere('user.role = :role', { role });
         }
+        if (roles && roles.length > 0) {
+            queryBuilder.andWhere('user.role IN (:...roles)', { roles });
+        }
         const [items, total] = await queryBuilder
+            .orderBy('user.role', 'ASC')
+            .addOrderBy('user.username', 'ASC')
             .skip(skip)
             .take(pageSize)
             .getManyAndCount();
@@ -119,6 +124,14 @@ let UsersService = class UsersService {
     }
     async remove(id) {
         const user = await this.findOne(id);
+        if (user.role === user_entity_1.UserRole.SUPER_ADMIN) {
+            const superAdminCount = await this.userRepository.count({
+                where: { role: user_entity_1.UserRole.SUPER_ADMIN }
+            });
+            if (superAdminCount <= 1) {
+                throw new common_1.ForbiddenException('系统必须保留至少一个超级管理员账户');
+            }
+        }
         await this.userRepository.remove(user);
     }
     async updatePassword(id, updatePasswordDto) {
@@ -134,8 +147,94 @@ let UsersService = class UsersService {
     }
     async updateRole(id, role) {
         const user = await this.findOne(id);
+        if (user.role === user_entity_1.UserRole.SUPER_ADMIN && role !== user_entity_1.UserRole.SUPER_ADMIN) {
+            const superAdminCount = await this.userRepository.count({
+                where: { role: user_entity_1.UserRole.SUPER_ADMIN }
+            });
+            if (superAdminCount <= 1) {
+                throw new common_1.ForbiddenException('系统必须保留至少一个超级管理员账户');
+            }
+        }
         user.role = role;
         return this.userRepository.save(user);
+    }
+    async initSuperAdmin() {
+        const existingSuperAdmin = await this.userRepository.findOne({
+            where: { role: user_entity_1.UserRole.SUPER_ADMIN }
+        });
+        if (existingSuperAdmin) {
+            return;
+        }
+        try {
+            const adminUsers = await this.userRepository.manager.query(`SELECT * FROM \`user\` WHERE role = 'admin' LIMIT 1`);
+            if (adminUsers && adminUsers.length > 0) {
+                const adminUser = adminUsers[0];
+                await this.userRepository.manager.query(`UPDATE \`user\` SET role = ? WHERE id = ?`, [user_entity_1.UserRole.SUPER_ADMIN, adminUser.id]);
+                return;
+            }
+        }
+        catch (error) {
+            console.error('查询 admin 用户失败:', error);
+        }
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const superAdmin = this.userRepository.create({
+            username: 'superadmin',
+            password: hashedPassword,
+            realName: '超级管理员',
+            role: user_entity_1.UserRole.SUPER_ADMIN
+        });
+        await this.userRepository.save(superAdmin);
+    }
+    async createTestUsers() {
+        const existingAdmin = await this.userRepository.findOne({
+            where: { username: 'superadmin' }
+        });
+        if (existingAdmin) {
+            existingAdmin.role = user_entity_1.UserRole.SUPER_ADMIN;
+            await this.userRepository.save(existingAdmin);
+        }
+        else {
+            await this.create({
+                username: 'superadmin',
+                password: 'admin123',
+                realName: '超级管理员',
+                role: user_entity_1.UserRole.SUPER_ADMIN
+            });
+        }
+        const existingProjectAdmin = await this.userRepository.findOne({
+            where: { username: 'projectadmin' }
+        });
+        if (!existingProjectAdmin) {
+            await this.create({
+                username: 'projectadmin',
+                password: 'admin123',
+                realName: '项目管理员',
+                role: user_entity_1.UserRole.PROJECT_ADMIN
+            });
+        }
+        const existingContentAdmin = await this.userRepository.findOne({
+            where: { username: 'contentadmin' }
+        });
+        if (!existingContentAdmin) {
+            await this.create({
+                username: 'contentadmin',
+                password: 'admin123',
+                realName: '内容管理员',
+                role: user_entity_1.UserRole.CONTENT_ADMIN
+            });
+        }
+        const existingEmployee = await this.userRepository.findOne({
+            where: { username: 'employee' }
+        });
+        if (!existingEmployee) {
+            await this.create({
+                username: 'employee',
+                password: 'admin123',
+                realName: '普通用户',
+                role: user_entity_1.UserRole.EMPLOYEE
+            });
+        }
+        return;
     }
 };
 exports.UsersService = UsersService;

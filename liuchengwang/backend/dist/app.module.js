@@ -15,13 +15,16 @@ const auth_module_1 = require("./modules/auth/auth.module");
 const project_module_1 = require("./modules/projects/project.module");
 const node_module_1 = require("./modules/nodes/node.module");
 const prerequisite_module_1 = require("./modules/prerequisites/prerequisite.module");
-const user_entity_1 = require("./database/entities/user.entity");
+const deliverable_module_1 = require("./modules/deliverables/deliverable.module");
+const user_entity_1 = require("./modules/users/entities/user.entity");
 const project_entity_1 = require("./database/entities/project.entity");
 const node_entity_1 = require("./database/entities/node.entity");
 const issue_entity_1 = require("./database/entities/issue.entity");
 const material_entity_1 = require("./database/entities/material.entity");
 const prerequisite_entity_1 = require("./database/entities/prerequisite.entity");
 const deliverable_entity_1 = require("./database/entities/deliverable.entity");
+const project_user_entity_1 = require("./database/entities/project-user.entity");
+const project_users_module_1 = require("./modules/project-users/project-users.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -41,7 +44,7 @@ exports.AppModule = AppModule = __decorate([
                     username: configService.get('DB_USERNAME', 'root'),
                     password: configService.get('DB_PASSWORD', 'root'),
                     database: configService.get('DB_DATABASE', 'liuchengwang'),
-                    entities: [user_entity_1.User, project_entity_1.Project, node_entity_1.Node, issue_entity_1.Issue, material_entity_1.Material, prerequisite_entity_1.Prerequisite, deliverable_entity_1.Deliverable],
+                    entities: [user_entity_1.User, project_entity_1.Project, node_entity_1.Node, issue_entity_1.Issue, material_entity_1.Material, prerequisite_entity_1.Prerequisite, deliverable_entity_1.Deliverable, project_user_entity_1.ProjectUser],
                     synchronize: false,
                 }),
             }),
@@ -50,6 +53,8 @@ exports.AppModule = AppModule = __decorate([
             project_module_1.ProjectModule,
             node_module_1.NodeModule,
             prerequisite_module_1.PrerequisiteModule,
+            deliverable_module_1.DeliverableModule,
+            project_users_module_1.ProjectUsersModule,
         ],
         controllers: [],
         providers: [],

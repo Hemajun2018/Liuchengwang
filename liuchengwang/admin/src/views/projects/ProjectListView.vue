@@ -23,7 +23,7 @@
           <el-select v-model="filterForm.status" placeholder="全部状态" clearable>
             <el-option label="未开始" :value="0" />
             <el-option label="进行中" :value="1" />
-            <el-option label="已结束" :value="2" />
+            <el-option label="已完成" :value="2" />
             <el-option label="已延期" :value="3" />
           </el-select>
         </el-form-item>
@@ -68,36 +68,56 @@
             >
               <el-option :value="0" label="未开始" />
               <el-option :value="1" label="进行中" />
-              <el-option :value="2" label="已结束" />
+              <el-option :value="2" label="已完成" />
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="创建人" width="120">
           <template #default="scope">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              @click="editProject(scope.row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              link
-              type="primary"
-              size="small"
-              @click="manageNodes(scope.row.id)"
-            >
-              节点管理
-            </el-button>
-            <el-button
-              link
-              type="danger"
-              size="small"
-              @click="handleDeleteProject(scope.row.id)"
-            >
-              删除
-            </el-button>
+            <span>{{ getCreatorName(scope.row.created_by) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建日期" width="150">
+          <template #default="scope">
+            <span>{{ formatDate(scope.row.created_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="300" fixed="right">
+          <template #default="scope">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <el-button
+                link
+                type="primary"
+                size="small"
+                @click="editProject(scope.row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                link
+                type="primary"
+                size="small"
+                @click="manageNodes(scope.row.id)"
+              >
+                节点管理
+              </el-button>
+              <el-button
+                link
+                type="primary"
+                size="small"
+                @click="handleCopyProject(scope.row)"
+              >
+                复制
+              </el-button>
+              <el-button
+                link
+                type="danger"
+                size="small"
+                @click="handleDeleteProject(scope.row.id)"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -154,11 +174,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getProjectList, deleteProject, updateProject } from '@/api/project';
+import { getProjectList, deleteProject, updateProject, copyProject, cloneProject } from '@/api/project';
 import { NodeStatus } from '@/api/node';
+import { format } from 'date-fns';
+import { useUserStore } from '@/stores/user';
 
 const router = useRouter();
 const loading = ref(false);
@@ -198,6 +220,30 @@ const editRules = reactive({
     { min: 6, max: 20, message: '密码长度应为6-20个字符', trigger: 'blur' }
   ]
 });
+
+// 获取用户信息的store
+const userStore = useUserStore();
+
+// 格式化日期
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-';
+  try {
+    return format(new Date(dateString), 'yyyy-MM-dd HH:mm');
+  } catch (error) {
+    return dateString;
+  }
+};
+
+// 获取创建者名称
+const getCreatorName = (creatorId: number) => {
+  // 如果项目创建者是当前用户
+  if (userStore.userInfo && creatorId === userStore.userInfo.id) {
+    return userStore.userInfo.realName || userStore.userInfo.username || '我';
+  }
+  
+  // 否则显示默认值
+  return `用户${creatorId}`;
+};
 
 // 初始化
 onMounted(() => {
@@ -337,6 +383,46 @@ const handleSaveEdit = async () => {
       }
     }
   });
+};
+
+// 复制项目
+const handleCopyProject = async (project: any) => {
+  try {
+    const { value: newProjectName } = await ElMessageBox.prompt(
+      '请输入新项目名称',
+      '复制项目',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: `${project.name}的副本`,
+        inputValidator: (value) => {
+          if (!value) {
+            return '项目名称不能为空';
+          }
+          return true;
+        }
+      }
+    );
+
+    if (newProjectName) {
+      // 尝试新的克隆接口
+      try {
+        await cloneProject(project.id, newProjectName);
+        ElMessage.success('项目复制成功');
+        fetchProjects(); // 刷新项目列表
+      } catch (error: any) {
+        // 如果新接口失败，尝试旧接口
+        console.error('使用clone接口失败，尝试使用copy接口:', error);
+        await copyProject(project.id, newProjectName);
+        ElMessage.success('项目复制成功');
+        fetchProjects();
+      }
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '项目复制失败');
+    }
+  }
 };
 </script>
 

@@ -9,9 +9,9 @@ export declare class Deliverable {
     id: number;
     node_id: number;
     description: string;
-    start_date: Date;
-    expected_end_date: Date;
-    duration_days: number;
+    start_date: Date | null;
+    expected_end_date: Date | null;
+    duration_days: number | null;
     status: DeliverableStatus;
     created_at: Date;
     updated_at: Date;

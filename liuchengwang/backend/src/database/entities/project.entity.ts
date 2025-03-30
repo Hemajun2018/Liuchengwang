@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Node } from './node.entity';
+import { ProjectUser } from './project-user.entity';
 
 export enum ProjectStatus {
   NOT_STARTED = 0,
@@ -37,6 +38,9 @@ export class Project {
   @Column({ type: 'json', nullable: true })
   results: Array<{ id?: number; description: string }>;
 
+  @Column({ type: 'int', nullable: true })
+  created_by: number;
+
   @CreateDateColumn()
   created_at: Date;
 
@@ -45,4 +49,7 @@ export class Project {
 
   @OneToMany(() => Node, node => node.project)
   nodes: Node[];
+  
+  @OneToMany(() => ProjectUser, projectUser => projectUser.project)
+  projectUsers: ProjectUser[];
 } 

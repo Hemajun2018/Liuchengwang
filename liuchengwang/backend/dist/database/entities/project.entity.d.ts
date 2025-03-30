@@ -1,4 +1,5 @@
 import { Node } from './node.entity';
+import { ProjectUser } from './project-user.entity';
 export declare enum ProjectStatus {
     NOT_STARTED = 0,
     IN_PROGRESS = 1,
@@ -18,7 +19,9 @@ export declare class Project {
         id?: number;
         description: string;
     }>;
+    created_by: number;
     created_at: Date;
     updated_at: Date;
     nodes: Node[];
+    projectUsers: ProjectUser[];
 }

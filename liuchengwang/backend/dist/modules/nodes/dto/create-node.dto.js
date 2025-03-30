@@ -11,7 +11,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateNodeDto = void 0;
 const class_validator_1 = require("class-validator");
-const node_entity_1 = require("../../../database/entities/node.entity");
 class CreateNodeDto {
 }
 exports.CreateNodeDto = CreateNodeDto;
@@ -20,40 +19,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateNodeDto.prototype, "name", void 0);
 __decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateNodeDto.prototype, "description", void 0);
-__decorate([
-    (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsString)({ each: true }),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Array)
-], CreateNodeDto.prototype, "descriptions", void 0);
-__decorate([
     (0, class_validator_1.IsNumber)(),
     __metadata("design:type", Number)
 ], CreateNodeDto.prototype, "order", void 0);
-__decorate([
-    (0, class_validator_1.IsEnum)(node_entity_1.NodeStatus),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CreateNodeDto.prototype, "status", void 0);
-__decorate([
-    (0, class_validator_1.IsDateString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Date)
-], CreateNodeDto.prototype, "startTime", void 0);
-__decorate([
-    (0, class_validator_1.IsDateString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Date)
-], CreateNodeDto.prototype, "endTime", void 0);
-__decorate([
-    (0, class_validator_1.IsDateString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Date)
-], CreateNodeDto.prototype, "expectedEndDate", void 0);
 __decorate([
     (0, class_validator_1.IsBoolean)(),
     (0, class_validator_1.IsOptional)(),

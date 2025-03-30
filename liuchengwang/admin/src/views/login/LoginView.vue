@@ -90,7 +90,7 @@ const handleLogin = async () => {
         if (response && response.token) {
           // 存储token和用户信息
           localStorage.setItem('token', response.token);
-          localStorage.setItem('user', JSON.stringify(response.user));
+          localStorage.setItem('userInfo', JSON.stringify(response.user));
           
           // 跳转到首页
           router.push('/');

@@ -308,4 +308,30 @@ page {
 
 .btn-text {
   font-size: 32rpx;
+}
+
+/* 添加按钮样式 */
+.add-btn {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.add-btn .btn-text {
+  color: #1890ff;
+}
+
+/* 刷新按钮样式 */
+.refresh-btn {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.refresh-btn .btn-text {
+  color: #52c41a;
+}
+
+/* 按钮悬停效果 */
+.action-btn:active {
+  transform: scale(0.95);
+  opacity: 0.9;
 } 

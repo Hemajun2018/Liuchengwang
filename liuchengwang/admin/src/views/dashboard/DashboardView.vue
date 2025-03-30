@@ -2,7 +2,7 @@
   <div class="dashboard-container">
     <el-row :gutter="16">
       <!-- 统计卡片 -->
-      <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="(item, index) in statisticsData" :key="index">
+      <el-col :xs="12" :sm="12" :md="8" :lg="8" v-for="(item, index) in statisticsData" :key="index">
         <el-card class="statistics-card" :body-style="{ padding: '16px' }">
           <div class="card-content">
             <div class="card-icon" :style="{ backgroundColor: item.color }">
@@ -10,94 +10,12 @@
             </div>
             <div class="card-info">
               <div class="card-title">{{ item.title }}</div>
-              <div class="card-value">{{ item.value }}</div>
+              <div class="card-value">
+                <el-skeleton v-if="loading" :rows="1" animated />
+                <template v-else>{{ item.value }}</template>
+              </div>
             </div>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="16" class="chart-row">
-      <!-- 项目状态分布 -->
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>项目状态分布</span>
-            </div>
-          </template>
-          <div class="chart-container">
-            <!-- 这里将来放置图表组件 -->
-            <div class="placeholder-chart">
-              <el-empty description="暂无数据" />
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 最近活动 -->
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>最近活动</span>
-            </div>
-          </template>
-          <div class="activity-list">
-            <el-timeline>
-              <el-timeline-item
-                v-for="(activity, index) in recentActivities"
-                :key="index"
-                :timestamp="activity.time"
-                :type="activity.type"
-              >
-                {{ activity.content }}
-              </el-timeline-item>
-            </el-timeline>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="table-row">
-      <!-- 最近项目 -->
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>最近项目</span>
-              <el-button class="button" text @click="goToProjects">
-                查看全部
-              </el-button>
-            </div>
-          </template>
-          <el-table :data="recentProjects" style="width: 100%">
-            <el-table-column prop="name" label="项目名称" />
-            <el-table-column prop="startTime" label="开始时间" width="180" />
-            <el-table-column prop="expectedEndTime" label="预计完成时间" width="180" />
-            <el-table-column prop="status" label="状态" width="120">
-              <template #default="scope">
-                <el-tag
-                  :type="getStatusType(scope.row.status)"
-                  effect="light"
-                >
-                  {{ getStatusText(scope.row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120">
-              <template #default="scope">
-                <el-button
-                  link
-                  type="primary"
-                  size="small"
-                  @click="viewProject(scope.row.id)"
-                >
-                  查看
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
         </el-card>
       </el-col>
     </el-row>
@@ -105,126 +23,73 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { getProjectList } from '@/api/project';
+import { ElMessage } from 'element-plus';
 
 const router = useRouter();
+const loading = ref(true);
 
 // 统计数据
 const statisticsData = ref([
   {
     title: '总项目数',
-    value: 12,
+    value: 0,
     icon: 'Folder',
     color: '#409EFF'
   },
   {
     title: '进行中项目',
-    value: 5,
+    value: 0,
     icon: 'Loading',
     color: '#67C23A'
   },
   {
     title: '已完成项目',
-    value: 6,
+    value: 0,
     icon: 'Check',
     color: '#E6A23C'
-  },
-  {
-    title: '已延期项目',
-    value: 1,
-    icon: 'Warning',
-    color: '#F56C6C'
   }
 ]);
 
-// 最近活动
-const recentActivities = ref([
-  {
-    content: '创建了项目"流程王开发"',
-    time: '2024-03-09 10:00',
-    type: 'primary'
-  },
-  {
-    content: '更新了项目"客户管理系统"的节点',
-    time: '2024-03-08 15:30',
-    type: 'success'
-  },
-  {
-    content: '添加了"产品设计"的问题',
-    time: '2024-03-07 09:45',
-    type: 'warning'
-  },
-  {
-    content: '完成了"数据分析平台"项目',
-    time: '2024-03-06 16:20',
-    type: 'success'
-  }
-]);
-
-// 最近项目
-const recentProjects = ref([
-  {
-    id: '1',
-    name: '流程王开发',
-    startTime: '2024-03-09',
-    expectedEndTime: '2024-04-08',
-    status: 1
-  },
-  {
-    id: '2',
-    name: '客户管理系统',
-    startTime: '2024-02-15',
-    expectedEndTime: '2024-03-30',
-    status: 1
-  },
-  {
-    id: '3',
-    name: '数据分析平台',
-    startTime: '2024-01-10',
-    expectedEndTime: '2024-03-05',
-    status: 2
-  },
-  {
-    id: '4',
-    name: '移动应用开发',
-    startTime: '2024-02-01',
-    expectedEndTime: '2024-02-28',
-    status: 3
-  }
-]);
-
-// 获取状态类型
-const getStatusType = (status: number) => {
-  switch (status) {
-    case 0: return 'info';    // 未开始
-    case 1: return 'primary'; // 进行中
-    case 2: return 'success'; // 已完成
-    case 3: return 'danger';  // 已延期
-    default: return 'info';
+// 获取项目数据
+const fetchProjectData = async () => {
+  try {
+    loading.value = true;
+    const response = await getProjectList();
+    
+    // 判断响应数据是否符合预期
+    if (response && response.items && Array.isArray(response.items)) {
+      const projects = response.items;
+      
+      // 更新统计数据
+      statisticsData.value[0].value = projects.length; // 总项目数
+      
+      // 计算进行中的项目数量（状态为1表示进行中）
+      const inProgressProjects = projects.filter(project => project.status === 1);
+      statisticsData.value[1].value = inProgressProjects.length;
+      
+      // 计算已完成的项目数量（状态为2表示已完成）
+      const completedProjects = projects.filter(project => project.status === 2);
+      statisticsData.value[2].value = completedProjects.length;
+    } else {
+      console.error('项目数据格式不符合预期:', response);
+    }
+  } catch (error) {
+    console.error('获取项目数据失败:', error);
+    // 发生错误时显示错误消息
+    ElMessage.error('获取项目数据失败，请刷新页面重试');
+  } finally {
+    // 无论成功或失败，都关闭加载状态
+    loading.value = false;
   }
 };
 
-// 获取状态文本
-const getStatusText = (status: number) => {
-  switch (status) {
-    case 0: return '未开始';
-    case 1: return '进行中';
-    case 2: return '已完成';
-    case 3: return '已延期';
-    default: return '未知';
-  }
-};
-
-// 查看项目详情
-const viewProject = (id: string) => {
-  router.push(`/projects/${id}`);
-};
-
-// 跳转到项目列表
-const goToProjects = () => {
-  router.push('/projects');
-};
+// 页面加载时获取数据
+onMounted(() => {
+  fetchProjectData();
+});
 </script>
 
 <style scoped>
@@ -271,43 +136,5 @@ const goToProjects = () => {
   font-size: 24px;
   font-weight: bold;
   color: #303133;
-}
-
-.chart-row {
-  margin-bottom: 20px;
-}
-
-.chart-card {
-  height: 400px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.chart-container {
-  height: 320px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.placeholder-chart {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.activity-list {
-  height: 320px;
-  overflow-y: auto;
-}
-
-.table-row {
-  margin-bottom: 20px;
 }
 </style> 

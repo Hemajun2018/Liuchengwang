@@ -1,17 +1,20 @@
 import { Repository } from 'typeorm';
 import { Project } from '../../database/entities/project.entity';
+import { ProjectUser } from '../../database/entities/project-user.entity';
 export declare class ProjectService {
     private projectRepository;
-    constructor(projectRepository: Repository<Project>);
+    private projectUserRepository;
+    constructor(projectRepository: Repository<Project>, projectUserRepository: Repository<ProjectUser>);
     create(createProjectDto: {
         name: string;
         password: string;
-    }): Promise<Project>;
+    }, currentUser?: any): Promise<Project>;
     findAll(params?: {
         page?: number;
         pageSize?: number;
         keyword?: string;
         status?: string;
+        user?: any;
     }): Promise<{
         items: Project[];
         total: number;
@@ -30,4 +33,5 @@ export declare class ProjectService {
             description: string;
         }>;
     }): Promise<Project>;
+    copyProject(sourceId: string, newProjectName: string): Promise<Project>;
 }

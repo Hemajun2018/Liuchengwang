@@ -1,5 +1,23 @@
 <script setup lang="ts">
 // App.vue - 应用根组件
+import { onMounted } from 'vue';
+import { useUserStore } from './stores/user';
+
+// 初始化用户信息
+onMounted(() => {
+  const userStore = useUserStore();
+  try {
+    // 从localStorage获取用户信息
+    const userInfoStr = localStorage.getItem('userInfo');
+    if (userInfoStr) {
+      const userInfo = JSON.parse(userInfoStr);
+      userStore.setUserInfo(userInfo);
+      console.log('已从本地存储加载用户信息');
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error);
+  }
+});
 </script>
 
 <template>

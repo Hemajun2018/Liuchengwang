@@ -121,7 +121,7 @@ const rules = {
   expected_end_date: [
     { required: false, message: '请选择预计结束日期', trigger: 'change' },
     {
-      validator: (_: any, value: string, callback: Function) => {
+      validator: (rule: any, value: string, callback: Function) => {
         if (form.value.start_date && value) {
           const start = new Date(form.value.start_date);
           const end = new Date(value);

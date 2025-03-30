@@ -1,5 +1,5 @@
 import request from '../utils/request';
-import type { User } from '../types/api';
+import type { User, UserRole } from '../types/api';
 
 interface UserListResponse {
   items: User[];
@@ -78,7 +78,7 @@ export const updatePassword = (id: number, data: {
 /**
  * 更新用户角色
  */
-export const updateUserRole = (id: number, role: 'admin' | 'employee') => {
+export const updateUserRole = (id: number, role: UserRole) => {
   return request<User>({
     url: `/users/${id}/role`,
     method: 'patch',
@@ -86,4 +86,16 @@ export const updateUserRole = (id: number, role: 'admin' | 'employee') => {
   }).then(response => {
     return response.data;
   });
-}; 
+};
+
+/**
+ * 搜索用户列表
+ * @param query 搜索关键字，如果为空则返回所有用户
+ */
+export function searchUserList(query: string) {
+  return request<any>({
+    url: '/users/search',
+    method: 'get',
+    params: { query }
+  });
+} 

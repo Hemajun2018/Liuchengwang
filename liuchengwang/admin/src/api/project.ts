@@ -1,5 +1,6 @@
 import request from '../utils/request';
 import { NodeStatus } from './node';
+import type { ProjectDetail, ProjectListResponse as TypeProjectListResponse } from '@/types/project';
 
 // 项目类型定义
 export interface Project {
@@ -12,11 +13,31 @@ export interface Project {
     id?: number;
     description: string;
   }>;
+  created_by?: number;
   created_at: Date;
   updated_at: Date;
 }
 
-interface ProjectListResponse {
+// 添加一个适配器函数，将Project转换为ProjectDetail
+export function adaptProjectToProjectDetail(project: Project): ProjectDetail {
+  return {
+    id: project.id,
+    name: project.name,
+    password: project.password,
+    deliverables: project.deliverables || '',
+    status: project.status,
+    // 安全地转换不存在的字段，使用类型断言或提供默认值
+    start_time: (project as any).start_time || null,
+    end_time: (project as any).end_time || null,
+    days_needed: (project as any).days_needed || 0, // 提供默认值
+    results: project.results || [],
+    created_by: project.created_by || 0, // 添加created_by字段处理
+    created_at: project.created_at,
+    updated_at: project.updated_at
+  };
+}
+
+export interface ProjectListResponse {
   items: Project[];
   total: number;
 }
@@ -39,7 +60,7 @@ export interface ProjectResult {
 export const createProject = (data: {
   name: string;
   password: string;
-}): Promise<Project> => {
+} | Partial<ProjectDetail>): Promise<Project> => {
   return request({
     url: '/projects',
     method: 'post',
@@ -66,7 +87,7 @@ export const getProjectList = (params?: {
 /**
  * 获取单个项目详情
  */
-export const getProject = (id: string): Promise<Project> => {
+export const getProject = (id: string | number): Promise<Project> => {
   return request({
     url: `/projects/${id}`,
     method: 'get'
@@ -76,7 +97,7 @@ export const getProject = (id: string): Promise<Project> => {
 /**
  * 更新项目信息
  */
-export const updateProject = (id: string, data: Partial<Project>): Promise<Project> => {
+export const updateProject = (id: string | number, data: Partial<Project> | Partial<ProjectDetail>): Promise<Project> => {
   return request({
     url: `/projects/${id}`,
     method: 'patch',
@@ -87,7 +108,7 @@ export const updateProject = (id: string, data: Partial<Project>): Promise<Proje
 /**
  * 删除项目
  */
-export const deleteProject = (id: string): Promise<void> => {
+export const deleteProject = (id: string | number): Promise<void> => {
   return request({
     url: `/projects/${id}`,
     method: 'delete'
@@ -134,4 +155,64 @@ export const updateProjectResult = (id: string, data: ProjectResult): Promise<Pr
     method: 'patch',
     data
   }).then(response => response.data);
+};
+
+/**
+ * 复制项目
+ */
+export function copyProject(id: string, newProjectName: string): Promise<Project> {
+  return request({
+    url: `/projects/copy?id=${id}`,
+    method: 'post',
+    data: { newProjectName }
+  }).then(response => response.data);
+}
+
+/**
+ * 克隆项目（使用新的接口）
+ */
+export function cloneProject(id: string, newProjectName: string): Promise<Project> {
+  return request({
+    url: `/projects/clone?id=${id}`,
+    method: 'put',
+    data: { newProjectName }
+  }).then(response => response.data);
+}
+
+/**
+ * 获取项目列表
+ * @param page 页码
+ * @param limit 每页数量
+ * @param search 搜索关键字
+ */
+export const getProjects = (page = 1, limit = 10, search = '') => {
+  return request<TypeProjectListResponse>({
+    url: '/projects',
+    method: 'get',
+    params: { page, limit, search }
+  });
+};
+
+/**
+ * 获取当前用户的项目列表
+ */
+export const getMyProjects = () => {
+  return request<TypeProjectListResponse>({
+    url: '/projects/my',
+    method: 'get'
+  });
+};
+
+/**
+ * 获取已分配的项目列表
+ */
+export const getAssignedProjects = () => {
+  return request.get('/project-users/my-projects').then(res => {
+    // 确保返回的是数组
+    if (!Array.isArray(res.data)) {
+      console.warn('获取到的项目数据格式不正确:', res.data);
+      return [];
+    }
+    return res.data;
+  });
 }; 

@@ -15,7 +15,7 @@ const mockData = {
     status: 'pending'
   },
   
-  // 项目元素
+  // 项目元素 - 确保即使只有前置条件也能正常显示
   '/api/projects/1/elements': [
     {
       id: 1,

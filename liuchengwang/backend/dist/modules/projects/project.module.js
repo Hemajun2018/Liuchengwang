@@ -12,12 +12,28 @@ const typeorm_1 = require("@nestjs/typeorm");
 const project_controller_1 = require("./project.controller");
 const project_service_1 = require("./project.service");
 const project_entity_1 = require("../../database/entities/project.entity");
+const node_entity_1 = require("../../database/entities/node.entity");
+const issue_entity_1 = require("../../database/entities/issue.entity");
+const material_entity_1 = require("../../database/entities/material.entity");
+const deliverable_entity_1 = require("../../database/entities/deliverable.entity");
+const project_user_entity_1 = require("../../database/entities/project-user.entity");
+const roles_guard_module_1 = require("../../common/guards/roles-guard.module");
 let ProjectModule = class ProjectModule {
 };
 exports.ProjectModule = ProjectModule;
 exports.ProjectModule = ProjectModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([project_entity_1.Project])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([
+                project_entity_1.Project,
+                node_entity_1.Node,
+                issue_entity_1.Issue,
+                material_entity_1.Material,
+                deliverable_entity_1.Deliverable,
+                project_user_entity_1.ProjectUser
+            ]),
+            roles_guard_module_1.RolesGuardModule,
+        ],
         controllers: [project_controller_1.ProjectController],
         providers: [project_service_1.ProjectService],
         exports: [project_service_1.ProjectService],

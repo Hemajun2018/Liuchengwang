@@ -91,7 +91,7 @@ request.interceptors.response.use(
           // 处理未授权错误
           console.error('未授权:', data);
           localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          localStorage.removeItem('userInfo');
           
           if (router.currentRoute.value.path !== '/login') {
             router.push('/login');

@@ -8,6 +8,11 @@ import App from './App.vue'
 import router from './router'
 import './style.css'
 
+// 添加全局导航错误处理
+router.onError((error) => {
+  console.error('路由导航错误:', error);
+});
+
 const app = createApp(App)
 
 // 注册所有图标

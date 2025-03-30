@@ -18,18 +18,18 @@
         <div class="material-description">
           {{ material.description }}
         </div>
-        <div class="material-dates" v-if="material.startDate || material.endDate">
-          <p v-if="material.startDate">
+        <div class="material-dates" v-if="material.start_date || material.expected_end_date">
+          <p v-if="material.start_date">
             <span class="date-label">开始日期：</span>
-            <span class="date-value">{{ formatDate(material.startDate) }}</span>
+            <span class="date-value">{{ formatDate(material.start_date) }}</span>
           </p>
-          <p v-if="material.endDate">
+          <p v-if="material.expected_end_date">
             <span class="date-label">预计结束日期：</span>
-            <span class="date-value">{{ formatDate(material.endDate) }}</span>
+            <span class="date-value">{{ formatDate(material.expected_end_date) }}</span>
           </p>
-          <p v-if="material.durationDays">
+          <p v-if="material.duration_days">
             <span class="date-label">持续天数：</span>
-            <span class="date-value">{{ material.durationDays }} 天</span>
+            <span class="date-value">{{ material.duration_days }} 天</span>
           </p>
         </div>
       </div>
@@ -45,7 +45,7 @@
 import { NodeStatus } from '@/api/node';
 import type { Material } from '@/api/node';
 
-defineProps<{
+const props = defineProps<{
   materials: Material[];
 }>();
 

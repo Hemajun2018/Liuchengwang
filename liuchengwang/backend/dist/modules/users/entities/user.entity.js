@@ -11,9 +11,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = exports.UserRole = void 0;
 const typeorm_1 = require("typeorm");
+const project_user_entity_1 = require("../../../database/entities/project-user.entity");
 var UserRole;
 (function (UserRole) {
-    UserRole["ADMIN"] = "admin";
+    UserRole["SUPER_ADMIN"] = "super_admin";
+    UserRole["PROJECT_ADMIN"] = "project_admin";
+    UserRole["CONTENT_ADMIN"] = "content_admin";
     UserRole["EMPLOYEE"] = "employee";
 })(UserRole || (exports.UserRole = UserRole = {}));
 let User = class User {
@@ -63,6 +66,10 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)({ name: 'updated_at' }),
     __metadata("design:type", Date)
 ], User.prototype, "updatedAt", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => project_user_entity_1.ProjectUser, projectUser => projectUser.user),
+    __metadata("design:type", Array)
+], User.prototype, "projectUsers", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)('user')
 ], User);

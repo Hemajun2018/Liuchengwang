@@ -4,6 +4,7 @@ import { Issue } from './issue.entity';
 import { Material } from './material.entity';
 import { Deliverable } from './deliverable.entity';
 
+// 此枚举暂时保留用于类型定义，但不作为实体字段
 export enum NodeStatus {
   NOT_STARTED = 'not_started',
   IN_PROGRESS = 'in_progress',

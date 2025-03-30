@@ -1,5 +1,8 @@
+import { ProjectUser } from '../../../database/entities/project-user.entity';
 export declare enum UserRole {
-    ADMIN = "admin",
+    SUPER_ADMIN = "super_admin",
+    PROJECT_ADMIN = "project_admin",
+    CONTENT_ADMIN = "content_admin",
     EMPLOYEE = "employee"
 }
 export declare class User {
@@ -13,4 +16,5 @@ export declare class User {
     avatar?: string;
     createdAt: Date;
     updatedAt: Date;
+    projectUsers: ProjectUser[];
 }

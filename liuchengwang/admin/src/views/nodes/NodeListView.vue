@@ -300,10 +300,10 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="开始日期">
-            {{ formatDate(currentIssueDetail.startDate) }}
+            {{ formatDate(currentIssueDetail.startDate ?? null) }}
           </el-descriptions-item>
           <el-descriptions-item label="预计结束日期">
-            {{ formatDate(currentIssueDetail.endDate) }}
+            {{ formatDate(currentIssueDetail.endDate ?? null) }}
           </el-descriptions-item>
           <el-descriptions-item label="持续天数">
             {{ currentIssueDetail.durationDays || '未计算' }}
@@ -512,10 +512,10 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="开始日期">
-            {{ formatDate(currentMaterialDetail.startDate) }}
+            {{ formatDate(currentMaterialDetail.startDate ?? null) }}
           </el-descriptions-item>
-          <el-descriptions-item label="预计结束日期">
-            {{ formatDate(currentMaterialDetail.endDate) }}
+          <el-descriptions-item label="结束日期">
+            {{ formatDate(currentMaterialDetail.endDate ?? null) }}
           </el-descriptions-item>
           <el-descriptions-item label="持续天数">
             {{ currentMaterialDetail.durationDays || '未计算' }}
@@ -1049,11 +1049,22 @@ const handleEditIssue = (nodeId: number, issue: Issue) => {
 
 const handleIssueDetail = (nodeId: number, issue: Issue) => {
   console.log('查看问题详情:', issue);
+  // 确保使用API中定义的Issue类型的字段
   currentIssueDetail.value = {
     ...issue,
-    startDate: issue.start_date,
-    endDate: issue.expected_end_date,
-    durationDays: issue.duration_days || 0
+    id: issue.id,
+    node_id: issue.node_id || nodeId,
+    content: issue.content,
+    status: issue.status,
+    start_date: issue.start_date,
+    expected_end_date: issue.expected_end_date,
+    duration_days: issue.duration_days,
+    created_at: issue.created_at || new Date(),
+    updated_at: issue.updated_at || new Date(),
+    // 兼容前端的别名
+    startDate: issue.start_date || issue.startDate,
+    endDate: issue.expected_end_date || issue.endDate,
+    durationDays: issue.duration_days || issue.durationDays || 0
   };
   currentNodeId.value = nodeId;
   currentIssueId.value = issue.id;
@@ -1065,9 +1076,9 @@ const handleEditMaterial = (nodeId: number, material: Material) => {
     nodeId,
     name: material.name,
     description: material.description,
-    startDate: material.start_date,
-    endDate: material.expected_end_date,
-    durationDays: material.duration_days,
+    startDate: material.start_date || material.startDate,
+    endDate: material.expected_end_date || material.endDate,
+    durationDays: material.duration_days || material.durationDays || 0,
     status: material.status
   };
   currentNodeId.value = nodeId;
@@ -1080,9 +1091,21 @@ const handleMaterialDetail = (nodeId: number, material: Material) => {
   // 确保material对象包含前端字段名的别名
   const materialWithAliases = {
     ...material,
-    startDate: material.start_date,
-    endDate: material.expected_end_date,
-    durationDays: material.duration_days || 0
+    // 后端字段
+    id: material.id,
+    node_id: material.node_id,
+    name: material.name,
+    description: material.description,
+    start_date: material.start_date,
+    expected_end_date: material.expected_end_date,
+    duration_days: material.duration_days,
+    status: material.status,
+    created_at: material.created_at,
+    updated_at: material.updated_at,
+    // 前端字段别名
+    startDate: material.start_date || material.startDate,
+    endDate: material.expected_end_date || material.endDate,
+    durationDays: material.duration_days || material.durationDays || 0
   };
   
   currentMaterialDetail.value = materialWithAliases;
@@ -1396,8 +1419,10 @@ const openResultDialog = () => {
 const openIssueDialog = (nodeId: number) => {
   console.log('开始编辑问题 - 节点ID:', nodeId);
   currentNodeId.value = nodeId;
+  // 确保当前问题为null，表示新建问题
   currentIssue.value = null;
   isEditIssueMode.value = false;
+  // 打开对话框前确保表单数据已重置
   issueDialogVisible.value = true;
 };
 

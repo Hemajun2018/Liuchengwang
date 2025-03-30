@@ -15,21 +15,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProjectController = void 0;
 const common_1 = require("@nestjs/common");
 const project_service_1 = require("./project.service");
+const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const user_entity_1 = require("../users/entities/user.entity");
 let ProjectController = class ProjectController {
     constructor(projectService) {
         this.projectService = projectService;
     }
-    create(createProjectDto) {
+    create(createProjectDto, req) {
         console.log('收到创建项目请求:', createProjectDto);
-        return this.projectService.create(createProjectDto);
+        return this.projectService.create(createProjectDto, req.user);
     }
-    findAll(query) {
+    findAll(query, req) {
         console.log('收到获取项目列表请求, 参数:', query);
         return this.projectService.findAll({
             page: query.page ? parseInt(query.page) : undefined,
             pageSize: query.pageSize ? parseInt(query.pageSize) : undefined,
             keyword: query.keyword,
-            status: query.status
+            status: query.status,
+            user: req.user
         });
     }
     findOne(id) {
@@ -54,9 +59,17 @@ let ProjectController = class ProjectController {
         console.log('收到删除项目请求, id:', id);
         return this.projectService.remove(id);
     }
-    verifyProject(verifyDto) {
-        console.log('收到验证项目请求:', verifyDto);
-        return this.projectService.verifyProject(verifyDto.name, verifyDto.password);
+    async cloneProject(id, newProjectName) {
+        console.log('收到克隆项目请求:', { id, newProjectName });
+        return this.projectService.copyProject(id, newProjectName);
+    }
+    async copyProject(id, newProjectName) {
+        console.log('收到复制项目请求:', { id, newProjectName });
+        return this.projectService.copyProject(id, newProjectName);
+    }
+    verifyProject(data) {
+        console.log('收到验证项目密码请求:', data);
+        return this.projectService.verifyProject(data.name, data.password);
     }
     async updatePrerequisite(id, prerequisiteDto) {
         console.log('收到更新前置条件请求:', {
@@ -75,20 +88,26 @@ let ProjectController = class ProjectController {
 };
 exports.ProjectController = ProjectController;
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.PROJECT_ADMIN),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], ProjectController.prototype, "create", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], ProjectController.prototype, "findAll", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -96,6 +115,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ProjectController.prototype, "findOne", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN, user_entity_1.UserRole.PROJECT_ADMIN),
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -104,12 +125,30 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ProjectController.prototype, "update", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.SUPER_ADMIN),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], ProjectController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Put)('clone'),
+    __param(0, (0, common_1.Query)('id')),
+    __param(1, (0, common_1.Body)('newProjectName')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], ProjectController.prototype, "cloneProject", null);
+__decorate([
+    (0, common_1.Post)('copy'),
+    __param(0, (0, common_1.Query)('id')),
+    __param(1, (0, common_1.Body)('newProjectName')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], ProjectController.prototype, "copyProject", null);
 __decorate([
     (0, common_1.Post)('verify'),
     __param(0, (0, common_1.Body)()),

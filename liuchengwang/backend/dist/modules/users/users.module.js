@@ -14,6 +14,7 @@ const config_1 = require("@nestjs/config");
 const user_entity_1 = require("../../database/entities/user.entity");
 const users_controller_1 = require("./users.controller");
 const users_service_1 = require("./users.service");
+const roles_guard_module_1 = require("../../common/guards/roles-guard.module");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
@@ -31,6 +32,7 @@ exports.UsersModule = UsersModule = __decorate([
                     },
                 }),
             }),
+            roles_guard_module_1.RolesGuardModule,
         ],
         controllers: [users_controller_1.UsersController],
         providers: [users_service_1.UsersService],

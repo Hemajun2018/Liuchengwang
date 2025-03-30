@@ -37,10 +37,24 @@ let DeliverableService = class DeliverableService {
     }
     async findAll(nodeId) {
         console.log('查询节点交付内容列表, 节点ID:', nodeId);
-        return this.deliverableRepository.find({
-            where: { node_id: nodeId },
-            order: { created_at: 'ASC' }
-        });
+        try {
+            const deliverables = await this.deliverableRepository.find({
+                where: { node_id: nodeId },
+                order: { created_at: 'ASC' }
+            });
+            console.log(`找到 ${deliverables.length} 个交付内容`);
+            console.log('交付内容列表:', JSON.stringify(deliverables, null, 2));
+            console.log('SQL查询条件:', { node_id: nodeId });
+            const count = await this.deliverableRepository.count({
+                where: { node_id: nodeId }
+            });
+            console.log(`数据库中节点ID为 ${nodeId} 的交付内容数量:`, count);
+            return deliverables;
+        }
+        catch (error) {
+            console.error(`查询节点交付内容列表失败: ${error.message}`, error.stack);
+            throw error;
+        }
     }
     async findOne(id) {
         console.log('查询单个交付内容, ID:', id);

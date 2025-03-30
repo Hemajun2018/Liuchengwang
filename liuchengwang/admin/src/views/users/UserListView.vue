@@ -21,7 +21,9 @@
         </el-form-item>
         <el-form-item label="角色">
           <el-select v-model="filterForm.role" placeholder="全部角色" clearable>
-            <el-option label="管理员" :value="UserRole.ADMIN" />
+            <el-option label="超级管理员" :value="UserRole.SUPER_ADMIN" />
+            <el-option label="项目管理员" :value="UserRole.PROJECT_ADMIN" />
+            <el-option label="内容管理员" :value="UserRole.CONTENT_ADMIN" />
             <el-option label="普通用户" :value="UserRole.EMPLOYEE" />
           </el-select>
         </el-form-item>
@@ -44,11 +46,9 @@
         <el-table-column prop="realName" label="真实姓名" min-width="120" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="phone" label="手机号" width="120" />
-        <el-table-column prop="role" label="角色" width="100">
+        <el-table-column prop="role" label="角色" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.role === UserRole.ADMIN ? 'danger' : 'info'">
-              {{ row.role === UserRole.ADMIN ? '管理员' : '普通用户' }}
-            </el-tag>
+            <role-tag :role="row.role" />
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="180">
@@ -126,7 +126,9 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="editingUser.role">
-            <el-option label="管理员" :value="UserRole.ADMIN" />
+            <el-option label="超级管理员" :value="UserRole.SUPER_ADMIN" />
+            <el-option label="项目管理员" :value="UserRole.PROJECT_ADMIN" />
+            <el-option label="内容管理员" :value="UserRole.CONTENT_ADMIN" />
             <el-option label="普通用户" :value="UserRole.EMPLOYEE" />
           </el-select>
         </el-form-item>
@@ -186,6 +188,7 @@ import { getUserList, updateUser, deleteUser, updatePassword } from '../../api/u
 import { register } from '../../api/auth';
 import type { User } from '../../types/api';
 import { UserRole } from '../../types/api';
+import RoleTag from '../../components/RoleTag.vue';
 
 // 加载状态
 const loading = ref(false);
@@ -360,12 +363,27 @@ const handleSubmit = async () => {
         
         if (editingUser.id) {
           // 更新用户
-          const { password, ...updateData } = userData;
+          const { realName, email, phone, role } = userData;
+          const updateData = {
+            realName,
+            role,
+            ...(email ? { email } : {}),
+            ...(phone ? { phone } : {})
+          };
           await updateUser(editingUser.id, updateData);
           ElMessage.success('更新成功');
         } else {
           // 创建用户
-          await register(userData as any);
+          const { username, password, realName, email, phone, role } = userData;
+          const registerData = {
+            username,
+            password,
+            realName,
+            role,
+            ...(email ? { email } : {}),
+            ...(phone ? { phone } : {})
+          };
+          await register(registerData);
           ElMessage.success('创建成功');
         }
         editDialogVisible.value = false;
