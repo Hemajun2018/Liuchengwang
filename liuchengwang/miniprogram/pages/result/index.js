@@ -7,8 +7,9 @@ Page({
     projectId: '',
     projectInfo: null,
     loading: true,
-    loadingFailed: false, // 新增：标记API请求是否失败
-    error: null
+    loadingFailed: false, // 标记API请求是否失败
+    error: null,
+    lastRefreshTime: 0 // 添加上次刷新时间戳
   },
 
   onLoad(options) {
@@ -27,10 +28,75 @@ Page({
     this.setData({ 
       projectId,
       loading: true,
-      error: null
+      error: null,
+      lastRefreshTime: Date.now() // 初始化刷新时间
     });
     
     this.loadProjectInfo();
+  },
+  
+  // 页面显示时频繁刷新数据
+  onShow() {
+    if (this.data.projectId) {
+      const now = Date.now();
+      console.log('成果页面显示，刷新数据');
+      
+      // 如果距离上次刷新超过2秒，则尝试刷新数据
+      if (now - this.data.lastRefreshTime > 2000) {
+        this.checkDataUpdates();
+        this.setData({ lastRefreshTime: now });
+      }
+    }
+  },
+  
+  // 检查数据更新 (不发送API请求)
+  checkDataUpdates() {
+    console.log('检查数据更新');
+    
+    // 1. 从全局数据提取成果信息
+    this.extractFromGlobalElements();
+    
+    // 2. 如果流程页已经加载过元素数据，我们可以直接使用
+    const hasElements = app.globalData.elements && app.globalData.elements.length > 0;
+    if (!hasElements) {
+      // 在流程页面没有加载时，不主动请求API
+      console.log('没有找到全局元素数据，等待流程页加载');
+    }
+  },
+  
+  // 从全局元素数据中提取成果信息
+  extractFromGlobalElements() {
+    console.log('从全局元素数据中提取成果信息');
+    
+    const elements = app.globalData.elements || [];
+    // 过滤出类型为"成果"的元素
+    const results = elements.filter(item => item.type_id === 5 || item.type === 'result');
+    
+    if (results.length > 0) {
+      console.log('从全局数据找到成果元素:', results);
+      
+      if (this.data.projectInfo) {
+        // 构建新的项目信息对象，包含成果数据
+        const updatedProjectInfo = {
+          ...this.data.projectInfo,
+          results: results.map(item => ({
+            id: item.id,
+            name: item.name || '成果',
+            description: item.content || '',
+            status: item.status || 'pending',
+            created_at: item.date_content || ''
+          }))
+        };
+        
+        this.setData({
+          projectInfo: updatedProjectInfo,
+          error: null
+        });
+        
+        // 更新本地存储
+        wx.setStorageSync('projectInfo', updatedProjectInfo);
+      }
+    }
   },
   
   // 加载项目信息
@@ -47,8 +113,8 @@ Page({
         loading: false
       });
       
-      // 静默刷新
-      this.silentRefreshFromApi();
+      // 从全局元素中提取成果
+      this.extractFromGlobalElements();
       return;
     }
     
@@ -61,12 +127,17 @@ Page({
         loading: false
       });
       
-      // 静默刷新
-      this.silentRefreshFromApi();
+      // 从全局元素中提取成果
+      this.extractFromGlobalElements();
       return;
     }
     
-    // 3. 从API中获取
+    // 3. 如果没有项目信息，直接从全局元素创建模拟项目
+    if (this.tryUseGlobalElements()) {
+      return;
+    }
+    
+    // 4. 最后尝试从API获取
     this.fetchProjectFromApi();
   },
   
@@ -84,7 +155,7 @@ Page({
     }
     
     try {
-      // 使用封装的request方法获取项目信息，注意这里修复了API路径
+      // 使用封装的request方法获取项目信息
       const projectData = await request({
         url: `/api/projects/${this.data.projectId}`,
         method: 'GET'
@@ -104,8 +175,8 @@ Page({
         error: null
       });
       
-      // 尝试加载成果列表
-      this.loadResultsList(processedInfo);
+      // 从全局元素中提取成果
+      this.extractFromGlobalElements();
     } catch (err) {
       console.error('请求项目信息失败:', err);
       
@@ -115,36 +186,8 @@ Page({
         error: '获取项目信息失败，显示缓存数据'
       });
       
-      // 尝试使用全局节点数据显示成果
+      // 尝试使用全局元素数据显示成果
       this.tryUseGlobalElements();
-    }
-  },
-  
-  // 静默刷新API数据
-  async silentRefreshFromApi() {
-    console.log('静默刷新项目信息');
-    
-    try {
-      const projectData = await request({
-        url: `/api/projects/${this.data.projectId}`,
-        method: 'GET'
-      });
-      
-      // 更新本地存储和缓存
-      const processedInfo = this.processProjectInfo(projectData);
-      wx.setStorageSync('projectInfo', processedInfo);
-      
-      // 尝试加载成果列表
-      this.loadResultsList(processedInfo);
-      
-      // 静默更新UI
-      this.setData({ 
-        projectInfo: processedInfo,
-        error: null
-      });
-    } catch (err) {
-      console.error('静默刷新项目信息失败:', err);
-      // 静默模式不更新错误状态
     }
   },
   
@@ -164,55 +207,53 @@ Page({
         name: '项目详情',
         results: results.map(item => ({
           id: item.id,
-          name: item.name,
-          description: item.content,
-          status: item.status,
-          created_at: item.date_content
+          name: item.name || '成果',
+          description: item.content || '',
+          status: item.status || 'pending',
+          created_at: item.date_content || ''
         }))
       };
       
       this.setData({
         projectInfo: simulatedProject,
         loading: false,
-        error: '使用缓存数据显示成果'
-      });
-    }
-  },
-  
-  // 加载成果列表
-  loadResultsList(projectInfo) {
-    // 检查项目信息中是否已包含成果列表
-    if (projectInfo.results && projectInfo.results.length > 0) {
-      console.log('项目信息中已包含成果列表:', projectInfo.results);
-      return;
-    }
-    
-    // 尝试从服务器获取成果列表
-    console.log('尝试从服务器获取成果列表...');
-    
-    // 使用正确的API路径
-    request({
-      url: `/api/projects/${this.data.projectId}/results`,
-      method: 'GET'
-    })
-    .then(results => {
-      console.log('从服务器获取的成果列表:', results);
-      
-      // 更新项目信息中的成果列表
-      const updatedProjectInfo = { ...this.data.projectInfo, results };
-      
-      this.setData({ 
-        projectInfo: updatedProjectInfo,
         error: null
       });
       
-      // 更新本地存储
-      wx.setStorageSync('projectInfo', updatedProjectInfo);
-    })
-    .catch(err => {
-      console.error('获取成果列表失败:', err);
-      // 不显示错误，因为成果列表可能为空
-    });
+      // 返回true表示已成功使用全局元素数据
+      return true;
+    }
+    
+    // 返回false表示未找到全局元素数据
+    return false;
+  },
+  
+  // 处理项目信息，确保格式正确
+  processProjectInfo(info) {
+    // 创建一个新对象，避免修改原始对象
+    const processedInfo = {...info};
+    
+    // 确保日期字段存在且格式正确
+    if (processedInfo.start_time) {
+      console.log('处理后的开始时间:', processedInfo.start_time);
+    }
+    
+    if (processedInfo.end_time) {
+      console.log('处理后的结束时间:', processedInfo.end_time);
+    }
+    
+    // 确保状态是数字
+    if (processedInfo.status !== undefined) {
+      processedInfo.status = Number(processedInfo.status);
+      console.log('处理后的状态:', processedInfo.status);
+    }
+    
+    // 确保results字段存在
+    if (!processedInfo.results) {
+      processedInfo.results = [];
+    }
+    
+    return processedInfo;
   },
   
   // 格式化日期
@@ -283,35 +324,15 @@ Page({
   
   // 返回流程图
   goBack() {
-    wx.navigateBack();
-  },
-  
-  // 处理项目信息，确保格式正确
-  processProjectInfo(info) {
-    // 创建一个新对象，避免修改原始对象
-    const processedInfo = {...info};
-    
-    // 确保日期字段存在且格式正确
-    if (processedInfo.start_time) {
-      console.log('处理后的开始时间:', processedInfo.start_time);
-    }
-    
-    if (processedInfo.end_time) {
-      console.log('处理后的结束时间:', processedInfo.end_time);
-    }
-    
-    // 确保状态是数字
-    if (processedInfo.status !== undefined) {
-      processedInfo.status = Number(processedInfo.status);
-      console.log('处理后的状态:', processedInfo.status);
-    }
-    
-    // 确保results字段存在
-    if (!processedInfo.results) {
-      processedInfo.results = [];
-    }
-    
-    return processedInfo;
+    wx.navigateBack({
+      // 返回上一页后刷新流程图数据
+      success: () => {
+        // 调度一个事件，通知流程图页面刷新数据
+        if (app.globalData.needRefreshFlow === undefined) {
+          app.globalData.needRefreshFlow = true;
+        }
+      }
+    });
   },
   
   // 添加新成果
@@ -322,8 +343,10 @@ Page({
     
     // 创建新成果对象
     const newResult = {
-      description: `新增成果项 ${dateStr}`,
-      created_at: dateStr
+      name: `新成果 ${dateStr}`,
+      description: `新增成果项描述 ${dateStr}`,
+      created_at: dateStr,
+      status: 'not_started'
     };
     
     try {
@@ -359,6 +382,9 @@ Page({
         title: '成果添加成功',
         icon: 'success'
       });
+      
+      // 标记需要刷新流程页
+      app.globalData.needRefreshFlow = true;
     } catch (err) {
       console.error('添加成果失败:', err);
       wx.showToast({
@@ -374,9 +400,28 @@ Page({
       title: '刷新中...',
     });
     
-    // 重新加载项目信息
-    this.loadProjectInfo().finally(() => {
-      wx.hideLoading();
+    // 检查跟新全局数据
+    this.checkDataUpdates();
+    
+    // 返回到流程页面，重新加载数据后再回来
+    wx.navigateBack({
+      success: () => {
+        // 标记需要刷新
+        app.globalData.needRefreshFlow = true;
+        
+        setTimeout(() => {
+          // 延迟导航回本页面
+          wx.navigateTo({
+            url: `/pages/result/result?id=${this.data.projectInfo.id || this.data.projectId}`,
+            complete: () => {
+              wx.hideLoading();
+            }
+          });
+        }, 500);
+      },
+      fail: () => {
+        wx.hideLoading();
+      }
     });
   },
   
@@ -385,12 +430,5 @@ Page({
     // 下拉刷新
     this.refreshResults();
     wx.stopPullDownRefresh();
-  },
-  
-  onShow() {
-    // 页面显示时刷新数据
-    if (this.data.projectId) {
-      this.loadProjectInfo();
-    }
   }
 }); 

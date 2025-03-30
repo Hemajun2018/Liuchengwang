@@ -7,7 +7,8 @@ Page({
     projectInfo: null,
     element: null,
     loading: true,
-    errorMessage: ''
+    errorMessage: '',
+    lastLoadTime: 0 // 添加上次加载时间戳
   },
 
   onLoad(options) {
@@ -46,10 +47,57 @@ Page({
       }
     }
     
-    this.setData({ projectInfo });
+    this.setData({ 
+      projectInfo,
+      lastLoadTime: Date.now() // 记录加载时间
+    });
     
     // 加载元素详情
     this.loadElementDetail(id);
+  },
+  
+  // 页面显示时刷新数据
+  onShow() {
+    // 如果有元素ID并且距离上次加载超过3秒
+    if (this.data.element && this.data.element.id) {
+      const now = Date.now();
+      if (now - this.data.lastLoadTime > 3000) {
+        console.log('页面重新显示，静默刷新数据');
+        this.refreshDataSilently(this.data.element.id);
+        this.setData({ lastLoadTime: now });
+      }
+    }
+  },
+  
+  // 静默刷新数据
+  refreshDataSilently(id) {
+    // 从全局状态获取最新元素
+    const elements = getApp().globalData.elements || [];
+    const freshElement = elements.find(item => item.id == id);
+    
+    if (freshElement) {
+      console.log('从全局状态获取到更新的元素数据:', freshElement);
+      this.setData({
+        element: freshElement
+      });
+      return;
+    }
+    
+    // 如果全局状态中没有，尝试从API静默获取
+    request({
+      url: `/api/elements/${id}`,
+      method: 'GET'
+    })
+      .then(res => {
+        console.log('API获取到更新的元素数据:', res.data);
+        this.setData({
+          element: res.data
+        });
+      })
+      .catch(err => {
+        console.error('静默刷新数据失败:', err);
+        // 失败时不更新UI也不显示错误
+      });
   },
   
   // 加载元素详情

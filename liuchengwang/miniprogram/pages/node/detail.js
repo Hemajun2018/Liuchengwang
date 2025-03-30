@@ -14,7 +14,8 @@ Page({
     deliverables: [],
     loading: true,
     error: null,
-    loadingFailed: false  // 新增：标记API请求是否失败
+    loadingFailed: false,  // 标记API请求是否失败
+    lastRefreshTime: 0     // 添加上次刷新时间戳
   },
 
   onLoad(options) {
@@ -35,7 +36,8 @@ Page({
       nodeId,
       projectId,
       loading: true,
-      error: null
+      error: null,
+      lastRefreshTime: Date.now() // 初始化刷新时间
     });
     
     // 获取项目和节点信息
@@ -44,9 +46,96 @@ Page({
   
   onShow() {
     if (this.data.nodeId) {
-      // 如果已有数据，只需静默刷新
-      this.loadDeliverables(true);
+      const now = Date.now();
+      // 每次页面显示都刷新交付内容，确保实时性
+      console.log('节点详情页显示，刷新交付内容');
+      
+      // 如果距离上次刷新超过1.5秒，则刷新全部数据
+      if (now - this.data.lastRefreshTime > 1500) {
+        this.silentRefreshAll();
+        this.setData({ lastRefreshTime: now });
+      } else {
+        // 否则只刷新交付内容
+        this.loadDeliverables(true);
+      }
     }
+  },
+  
+  // 静默刷新所有数据
+  silentRefreshAll() {
+    console.log('静默刷新所有节点数据');
+    
+    // 1. 从全局数据更新节点信息
+    this.checkGlobalNodesUpdate();
+    
+    // 2. 刷新交付内容
+    this.loadDeliverables(true);
+    
+    // 3. 尝试从API刷新节点信息（优先级较低）
+    this.refreshNodeFromApi(true);
+  },
+  
+  // 检查全局数据中是否有更新的节点信息
+  checkGlobalNodesUpdate() {
+    const allNodes = app.globalData.elements || [];
+    const freshNode = allNodes.find(item => item.id == this.data.nodeId);
+    
+    if (freshNode) {
+      console.log('从全局数据获取到更新的节点信息:', freshNode);
+      const statusText = this.getStatusText(freshNode.status);
+      this.setData({
+        nodeName: freshNode.name || '',
+        nodeStatus: freshNode.status || 'not_started',
+        nodeStatusText: statusText
+      });
+      
+      // 缓存节点信息
+      const cacheKey = cacheManager.createProjectCacheKey(
+        this.data.projectId, 
+        'node', 
+        this.data.nodeId
+      );
+      cacheManager.setCache(cacheKey, freshNode);
+    }
+  },
+  
+  // 从API刷新节点信息
+  refreshNodeFromApi(isSilent = false) {
+    console.log('从API刷新节点信息');
+    
+    request({
+      url: `/api/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
+      method: 'GET'
+    })
+    .then(nodeInfo => {
+      console.log('成功刷新节点信息:', nodeInfo);
+      
+      const statusText = this.getStatusText(nodeInfo.status);
+      
+      this.setData({
+        nodeName: nodeInfo.name || '',
+        nodeStatus: nodeInfo.status || 'not_started',
+        nodeStatusText: statusText,
+        error: null
+      });
+      
+      // 缓存节点信息
+      const cacheKey = cacheManager.createProjectCacheKey(
+        this.data.projectId, 
+        'node', 
+        this.data.nodeId
+      );
+      cacheManager.setCache(cacheKey, nodeInfo);
+    })
+    .catch(error => {
+      console.error('刷新节点信息失败:', error);
+      if (!isSilent) {
+        // 非静默模式才显示错误
+        this.setData({
+          error: '刷新节点信息失败'
+        });
+      }
+    });
   },
   
   // 初始化页面数据
@@ -230,9 +319,7 @@ Page({
       });
       
       // 静默更新缓存
-      if (!isSilent) {
-        this.fetchDeliverablesFromApi(true);
-      }
+      this.fetchDeliverablesFromApi(true);
       return;
     }
     
