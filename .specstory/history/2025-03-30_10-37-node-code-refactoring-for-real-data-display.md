@@ -2908,6 +2908,316 @@ _**Assistant**_
 
 ---
 
+```diff
+  const { isLoggedIn } = require('../../utils/auth');
+  const cacheManager = require('../../utils/cache');
+- 
+- // 添加一些模拟数据，以防API请求失败
+- const MOCK_DATA = {
+-   // 基于数据库结构创建的模拟数据
+-   getNodeInfo: (nodeId) => ({
+-     id: nodeId,
+-     name: `节点${nodeId}`,
+-     status: 'in_progress',
+-     description: '节点详情描述'
+-   }),
+-   
+-   getDeliverables: (nodeId) => [
+-     {
+-       id: '1',
+-       name: '交付内容示例',
+-       description: '详细的交付内容描述',
+-       status: 'in_progress',
+-       status_text: '进行中',
+-       start_date: '2025-03-01',
+-       end_date: '2025-03-30'
+-     }
+-   ]
+- };
+  
+  Page({
+      loading: true,
+      error: null,
+-     offlineMode: false  // 新增：标记是否处于离线模式
++     loadingFailed: false  // 新增：标记API请求是否失败
+    },
+  
+    fetchNodeFromApi() {
+      console.log('从API获取节点信息');
+-     // 标记为离线模式，防止多次API失败
+-     if (this.data.offlineMode) {
+-       this.useMockNodeData();
++     // 避免重复请求
++     if (this.data.loadingFailed) {
++       this.setData({
++         nodeName: `节点${this.data.nodeId}`,
++         nodeStatus: 'not_started',
++         nodeStatusText: '未知状态',
++         loading: false,
++         error: '无法获取节点信息，请检查网络连接或联系管理员'
++       });
+        return;
+      }
+        console.error('获取节点信息失败:', error);
+        
+-       // 如果API获取失败，使用模拟数据
+-       this.useMockNodeData();
+-     });
+-   },
+-   
+-   // 使用模拟节点数据
+-   useMockNodeData() {
+-     console.log('使用模拟节点数据');
+        this.setData({
+-       offlineMode: true,
+          nodeName: `节点${this.data.nodeId}`,
+-       nodeStatus: 'in_progress',
+-       nodeStatusText: '进行中',
+-       loading: false
++         nodeStatus: 'not_started',
++         nodeStatusText: '未知状态',
++         loadingFailed: true,
++         loading: false,
++         error: '无法获取节点信息，请检查网络连接或联系管理员'
++       });
+      });
+    },
+      }
+      
+-     // 标记为离线模式，防止多次API失败
+-     if (this.data.offlineMode) {
+-       this.useMockDeliverables();
++     // 避免重复请求
++     if (this.data.loadingFailed && !isSilent) {
++       this.setData({
++         deliverables: [],
++         loading: false,
++         error: this.data.error || '无法获取交付内容，请检查网络连接或联系管理员'
++       });
+        return;
+      }
+        
+        if (!isSilent) {
+-         // 如果API获取失败，使用模拟数据
+-         this.useMockDeliverables();
++         this.setData({
++           deliverables: [],
++           loadingFailed: true,
++           loading: false,
++           error: '无法获取交付内容，请检查网络连接或联系管理员'
++         });
+        } else {
+          // 静默请求失败则不更新UI
+      });
+    },
+-   
+-   // 使用模拟交付内容数据
+-   useMockDeliverables() {
+-     console.log('使用模拟交付内容数据');
+-     
+-     // 根据数据库结构，创建符合格式的模拟数据
+-     const mockDeliverables = [
+-       {
+-         id: '101',
+-         name: '交付内容示例',
+-         description: '详细的交付内容描述',
+-         status: 'in_progress',
+-         status_text: '进行中',
+-         start_date: '2025-03-01',
+-         end_date: '2025-03-30'
+-       }
+-     ];
+-     
+-     this.setData({
+-       offlineMode: true,
+-       deliverables: mockDeliverables,
+-       loading: false
+-     });
+-     
+-     // 也可以缓存模拟数据，以便后续使用
+-     const cacheKey = cacheManager.createProjectCacheKey(
+-       this.data.projectId, 
+-       'deliverables', 
+-       this.data.nodeId
+-     );
+-     cacheManager.setCache(cacheKey, mockDeliverables);
+-   },
+  
+    // 获取状态文本
+```
+
+---
+
+## 无模拟数据的解决方案说明
+
+我已经按照您的要求移除了所有模拟数据，采用了一种更为干净的缓存优先策略。以下是新方案的工作原理：
+
+### 多级数据获取策略
+
+数据获取的优先级顺序为：
+1. 全局数据（app.globalData）
+2. 本地缓存（wx.getStorageSync 和 cacheManager）
+3. API请求
+
+### 错误处理改进
+
+当API请求失败时：
+- 使用 `loadingFailed` 标记来避免重复请求
+- 显示友好的错误提示信息
+- 使用简单的默认值（如"节点+ID"）作为节点名称
+- 将状态设为"未知状态"而不是随意设置状态
+
+### 缓存管理
+
+缓存策略保持不变：
+- 分别缓存节点信息和交付内容
+- 使用cacheManager创建一致的缓存键
+- 支持静默刷新缓存（不干扰用户体验）
+
+### 页面导航逻辑
+
+我已经改进了节点页面到详情页面的跳转逻辑：
+- 确保在跳转时携带正确的nodeId和projectId参数
+- 当全局数据中没有项目信息时，尝试从本地缓存获取
+
+## 用户体验改进
+
+这个方案保持了良好的用户体验：
+1. 当数据可用时，页面显示正确的节点信息和交付内容
+2. 当API请求失败时，显示友好的错误提示，而不是空白页面
+3. 使用缓存减少加载时间和网络请求
+
+这个方案比使用模拟数据更真实，因为它不会显示不存在的信息，而是明确告知用户什么数据无法获取。
+
+---
+
+_**User**_
+
+
+
+---
+
+_**Assistant**_
+
+
+
+---
+
+_**User**_
+
+好的，现在请解决成果页面的问题, 点击成果页面也是看不到成果的详情数据, 我感觉他的问题应该是跟节点差不多的, 请你参照上面节点的模式, 修复成果页面的问题: 以下是他报错的代码，我发给你，你看一看:
+
+跳转到成果详情页
+[自动热重载] 已开启代码文件保存后自动热重载
+[Deprecation] SharedArrayBuffer will require cross-origin isolation as of M92, around July 2021. See https://developer.chrome.com/blog/enabling-shared-array-buffer/ for more details.
+request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:222 GET http://localhost:3000/projects/bb8e02a4-a23d-4043-b749-c09daf4f7522 404 (Not Found)(env: macOS,mp,1.06.2412050; lib: 3.7.10)
+(anonymous) @ request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:222
+request @ request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:221
+loadProjectInfo @ index.js:30
+onLoad @ index.js:21
+request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:222 GET http://localhost:3000/projects/bb8e02a4-a23d-4043-b749-c09daf4f7522 404 (Not Found)(env: macOS,mp,1.06.2412050; lib: 3.7.10)
+(anonymous) @ request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:222
+request @ request.js?t=wechat&s=1743291940440&v=7505e1427735fb976e938c34abf46cbd:221
+loadProjectInfo @ index.js:30
+onShow @ index.js:267
+index.js:48 请求项目信息失败: {data: {…}, header: Proxy, statusCode: 404, cookies: Array(0), accelerateType: "none", …}(env: macOS,mp,1.06.2412050; lib: 3.7.10)
+loadProjectInfo @ index.js:48
+async function (async)
+loadProjectInfo @ index.js:30
+onLoad @ index.js:21
+index.js:48 请求项目信息失败: {data: {…}, header: Proxy, statusCode: 404, cookies: Array(0), accelerateType: "none", …}(env: macOS,mp,1.06.2412050; lib: 3.7.10)
+loadProjectInfo @ index.js:48
+async function (async)
+loadProjectInfo @ index.js:30
+onShow @ index.js:267 嗯
+
+---
+
+_**Assistant**_
+
+<think>
+我看到用户是要我解决成果页面的问题，与之前解决的节点详情页面的问题类似。从错误日志来看，成果页面遇到了类似的API请求404的问题：
+
+```
+GET http://localhost:3000/projects/bb8e02a4-a23d-4043-b749-c09daf4f7522 404 (Not Found)
+```
+
+从错误日志来看，问题出在尝试加载项目信息时（`loadProjectInfo`），API路径似乎有问题。注意观察URL中缺少了"/api"前缀，URL是"/projects/..." 而不是 "/api/projects/..."，这可能是问题之一。
+
+让我思考一下解决方案：
+
+1. 需要查看成果页面的相关代码，看看它的实现与节点页面有什么不同
+2. 从日志可以判断，问题出在index.js文件中的loadProjectInfo函数
+3. 我需要采用与节点页面类似的解决方案，实现多级数据获取策略：
+   - 优先使用全局数据
+   - 其次使用本地缓存数据
+   - 最后才尝试API请求，失败时给出友好提示
+
+我没有看到成果页面的完整代码，但根据错误信息和之前的经验，我可以推断出需要修改的内容。我需要检查成果页面相关的JS文件，并进行类似的改造。
+
+根据错误信息，问题出在"index.js"文件中，这可能是成果页面的主JS文件。我需要查看这个文件，并参照之前的节点页面修复方案进行修改。
+</think>
+
+# 解决成果页面问题
+
+从错误日志来看，成果页面存在与节点页面类似的API请求问题。主要问题是请求 URL 路径不正确 (`http://localhost:3000/projects/...` 而不是 `/api/projects/...`)，导致 404 错误。
+
+让我针对这个问题进行修复：
+
+---
+
+<details>
+            <summary>Searched codebase "outcome index.js" • **0** results</summary>
+        
+No results found
+</details>
+
+---
+
+<details>
+            <summary>Listed directory liuchengwang/miniprogram/pages • **9** results</summary>
+        
+| Name |
+|-------|
+| 📁 `result` |
+| 📁 `index` |
+| 📁 `project` |
+| 📁 `flow` |
+| 📁 `node` |
+| 📁 `prerequisite` |
+| 📁 `problem` |
+| 📁 `material` |
+| 📁 `precondition` |
+
+</details>
+
+---
+
+<details>
+            <summary>Listed directory liuchengwang/miniprogram/pages/result • **7** results</summary>
+        
+| Name |
+|-------|
+| 📄 `result.js` |
+| 📄 `index.wxss` |
+| 📄 `index.wxml` |
+| 📄 `index.js` |
+| 📄 `result.wxss` |
+| 📄 `result.json` |
+| 📄 `result.wxml` |
+
+</details>
+
+---
+
+Read file: liuchengwang/miniprogram/pages/result/index.js
+
+---
+
+Read file: liuchengwang/miniprogram/pages/result/index.js
+
+---
+
 
 
 ---
