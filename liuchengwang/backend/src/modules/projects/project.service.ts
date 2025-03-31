@@ -6,7 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { Node } from '../../database/entities/node.entity';
 import { Issue } from '../../database/entities/issue.entity';
 import { Material } from '../../database/entities/material.entity';
-import { Deliverable } from '../../database/entities/deliverable.entity';
+import { Deliverable, DeliverableStatus } from '../../database/entities/deliverable.entity';
 import { ProjectUser } from '../../database/entities/project-user.entity';
 import { UserRole } from '../../database/entities/user.entity';
 import { Brackets } from 'typeorm';
@@ -426,7 +426,7 @@ export class ProjectService {
           
           // 7. 查询节点的问题
           const sourceIssues = await manager.find(Issue, {
-            where: { nodeId: sourceNode.id }
+            where: { node: { id: sourceNode.id } }
           });
           
           if (sourceIssues.length > 0) {
@@ -436,7 +436,7 @@ export class ProjectService {
               const newIssue = new Issue();
               newIssue.content = sourceIssue.content;
               newIssue.status = sourceIssue.status || 'pending';
-              newIssue.nodeId = savedNode.id;  // 直接设置nodeId而不是node对象
+              newIssue.node = savedNode;  // 设置node关系对象而不是直接设置ID
               newIssue.start_date = sourceIssue.start_date;
               newIssue.expected_end_date = sourceIssue.expected_end_date;
               newIssue.duration_days = sourceIssue.duration_days;
@@ -449,7 +449,7 @@ export class ProjectService {
           
           // 8. 查询节点的材料
           const sourceMaterials = await manager.find(Material, {
-            where: { node_id: sourceNode.id }
+            where: { nodeId: sourceNode.id }
           });
           
           if (sourceMaterials.length > 0) {
@@ -461,13 +461,13 @@ export class ProjectService {
               newMaterial.description = sourceMaterial.description;
               newMaterial.url = sourceMaterial.url;
               newMaterial.type = sourceMaterial.type;
-              newMaterial.node_id = savedNode.id;  // 直接设置node_id而不是node对象
+              newMaterial.nodeId = savedNode.id;  // 使用正确的字段名nodeId
               newMaterial.start_date = sourceMaterial.start_date;
               newMaterial.expected_end_date = sourceMaterial.expected_end_date;
               newMaterial.duration_days = sourceMaterial.duration_days;
               newMaterial.status = sourceMaterial.status;
-              newMaterial.created_at = new Date();
-              newMaterial.updated_at = new Date();
+              newMaterial.createdAt = new Date();  // 使用正确的字段名createdAt
+              newMaterial.updatedAt = new Date();  // 使用正确的字段名updatedAt
               
               await manager.save(Material, newMaterial);
             }
@@ -484,8 +484,8 @@ export class ProjectService {
             for (const sourceDeliverable of sourceDeliverables) {
               const newDeliverable = new Deliverable();
               newDeliverable.description = sourceDeliverable.description;
-              newDeliverable.status = sourceDeliverable.status || 'not_started';
-              newDeliverable.node_id = savedNode.id;  // 直接设置node_id而不是node对象
+              newDeliverable.status = sourceDeliverable.status || DeliverableStatus.NOT_STARTED;
+              newDeliverable.node_id = savedNode.id;
               newDeliverable.start_date = sourceDeliverable.start_date;
               newDeliverable.expected_end_date = sourceDeliverable.expected_end_date;
               newDeliverable.duration_days = sourceDeliverable.duration_days;

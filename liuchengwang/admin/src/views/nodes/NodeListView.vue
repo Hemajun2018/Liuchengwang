@@ -273,8 +273,10 @@
     <!-- 问题对话框 -->
     <el-dialog
       v-model="issueDialogVisible"
+      v-if="issueDialogVisible"
       :title="isEditIssueMode ? '编辑问题' : '添加问题'"
       width="500px"
+      @closed="handleDialogClosed"
     >
       <issue-form
         :initial-data="currentIssue || undefined"
@@ -1417,12 +1419,23 @@ const openResultDialog = () => {
 
 // 打开问题对话框
 const openIssueDialog = (nodeId: number) => {
-  console.log('开始编辑问题 - 节点ID:', nodeId);
+  console.log('开始添加问题 - 节点ID:', nodeId);
   currentNodeId.value = nodeId;
+  
   // 确保当前问题为null，表示新建问题
   currentIssue.value = null;
+  
+  // 重置问题表单内容，参照openMaterialDialog的做法
+  issueForm.value = {
+    content: '',
+    status: IssueStatus.PENDING,
+    startDate: null,
+    expectedEndDate: null,
+    durationDays: null
+  };
+  
   isEditIssueMode.value = false;
-  // 打开对话框前确保表单数据已重置
+  // 打开对话框
   issueDialogVisible.value = true;
 };
 
@@ -1568,6 +1581,21 @@ const handleIssueCancel = () => {
   issueDialogVisible.value = false;
 };
 
+// 对话框关闭后的处理函数
+const handleDialogClosed = () => {
+  console.log('问题对话框已关闭，重置状态');
+  // 重置相关状态
+  currentIssue.value = null;
+  // 重置表单数据
+  issueForm.value = {
+    content: '',
+    status: IssueStatus.PENDING,
+    startDate: null,
+    expectedEndDate: null,
+    durationDays: null
+  };
+};
+
 // 从详情页编辑问题
 const handleEditIssueFromDetail = () => {
   if (currentIssueDetail.value && currentNodeId.value) {
@@ -1700,6 +1728,9 @@ const handleIssueSubmit = async (data: {
     
     issueDialogVisible.value = false;
     await fetchNodes();
+    
+    // 提交成功后重置状态
+    currentIssue.value = null;
     
   } catch (error) {
     console.error('保存问题失败:', error);

@@ -35,13 +35,23 @@ const form = ref({
 
 // 重置表单为初始状态或根据props更新表单
 const resetForm = () => {
-  form.value = {
-    content: props.initialData?.content || '',
-    status: props.initialData?.status || IssueStatus.PENDING,
-    start_date: props.initialData?.startDate || null,
-    expected_end_date: props.initialData?.endDate || null,
-    duration_days: props.initialData?.durationDays || null
-  };
+  if (!props.initialData) {
+    form.value = {
+      content: '',
+      status: IssueStatus.PENDING,
+      start_date: null,
+      expected_end_date: null,
+      duration_days: null
+    };
+  } else {
+    form.value = {
+      content: props.initialData.content || '',
+      status: props.initialData.status || IssueStatus.PENDING,
+      start_date: props.initialData.startDate || null,
+      expected_end_date: props.initialData.endDate || null,
+      duration_days: props.initialData.durationDays || null
+    };
+  }
 };
 
 // 初始化表单
