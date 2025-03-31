@@ -10,6 +10,7 @@ import { Deliverable } from '../../database/entities/deliverable.entity';
 import { ProjectUser } from '../../database/entities/project-user.entity';
 import { UserRole } from '../../database/entities/user.entity';
 import { Brackets } from 'typeorm';
+import { Prerequisite } from '../../database/entities/prerequisite.entity';
 
 @Injectable()
 export class ProjectService {
@@ -331,99 +332,182 @@ export class ProjectService {
   }
 
   async copyProject(sourceId: string, newProjectName: string) {
-    // 使用事务确保数据一致性
+    console.log('开始复制项目，源ID:', sourceId, '新名称:', newProjectName);
+    
     return await this.projectRepository.manager.transaction(async manager => {
-      // 1. 获取源项目及其所有关联数据
-      const sourceProject = await manager.findOne(Project, {
-        where: { id: sourceId },
-        relations: ['nodes', 'nodes.issues', 'nodes.materials', 'nodes.deliverables']
-      });
-      
-      if (!sourceProject) {
-        throw new NotFoundException('源项目不存在');
-      }
+      try {
+        // 1. 先获取源项目基本信息（不包含关系）
+        const sourceProject = await manager.findOne(Project, {
+          where: { id: sourceId }
+        });
+        
+        if (!sourceProject) {
+          throw new NotFoundException('源项目不存在');
+        }
 
-      // 检查新项目名是否已存在
-      const existingProject = await manager.findOne(Project, {
-        where: { name: newProjectName }
-      });
+        // 检查新项目名是否已存在
+        const existingProject = await manager.findOne(Project, {
+          where: { name: newProjectName }
+        });
 
-      if (existingProject) {
-        throw new ConflictException('项目名称已存在');
-      }
+        if (existingProject) {
+          throw new ConflictException('项目名称已存在');
+        }
 
-      // 2. 创建新项目
-      const newProject = manager.create(Project, {
-        ...sourceProject,
-        id: undefined, // 让数据库生成新ID
-        name: newProjectName,
-        password: sourceProject.password, // 保持相同的密码
-        created_at: new Date(),
-        updated_at: new Date(),
-        status: ProjectStatus.NOT_STARTED,
-        days_needed: sourceProject.days_needed,
-        created_by: sourceProject.created_by ? Number(sourceProject.created_by) : null
-      } as Partial<Project>);
-      
-      // 3. 保存新项目
-      const savedProject = await manager.save(Project, newProject);
-      
-      // 4. 复制节点及其关联数据
-      if (sourceProject.nodes) {
-        for (const sourceNode of sourceProject.nodes) {
-          const newNode = manager.create(Node, {
-            ...sourceNode,
-            id: undefined,
-            projectId: savedProject.id,
-            created_at: new Date(),
-            updated_at: new Date()
+        // 2. 创建新项目（只复制必要的属性）
+        const newProject = new Project();
+        newProject.name = newProjectName;
+        newProject.password = sourceProject.password;
+        newProject.deliverables = sourceProject.deliverables;
+        newProject.status = ProjectStatus.NOT_STARTED;
+        // 深度复制结果数组，避免引用问题
+        newProject.results = sourceProject.results ? JSON.parse(JSON.stringify(sourceProject.results)) : undefined;
+        newProject.created_at = new Date();  // Project 使用下划线命名
+        newProject.updated_at = new Date();  // Project 使用下划线命名
+        newProject.created_by = sourceProject.created_by;
+        
+        // 3. 保存新项目
+        const savedProject = await manager.save(Project, newProject);
+        console.log('新项目创建成功，ID:', savedProject.id);
+        
+        // 4. 先复制前置条件，因为它们独立于节点，直接关联到项目
+        // 查找源项目的前置条件
+        const sourcePrerequisites = await manager.find(Prerequisite, {
+          where: { project_id: sourceId }
+        });
+        
+        console.log(`找到源项目前置条件 ${sourcePrerequisites.length} 个，开始复制`);
+        
+        // 复制每个前置条件
+        for (const sourcePrerequisite of sourcePrerequisites) {
+          const newPrerequisite = new Prerequisite();
+          newPrerequisite.content = sourcePrerequisite.content;
+          newPrerequisite.project_id = savedProject.id;
+          newPrerequisite.status = sourcePrerequisite.status || 'pending';
+          newPrerequisite.start_date = sourcePrerequisite.start_date;
+          newPrerequisite.expected_end_date = sourcePrerequisite.expected_end_date;
+          newPrerequisite.duration_days = sourcePrerequisite.duration_days;
+          newPrerequisite.created_at = new Date();
+          newPrerequisite.updated_at = new Date();
+          
+          await manager.save(Prerequisite, newPrerequisite);
+          console.log(`前置条件 "${newPrerequisite.content}" 复制成功`);
+        }
+        
+        // 5. 单独获取源项目的节点（不使用关系加载，避免引用问题）
+        const sourceNodes = await manager.find(Node, {
+          where: { projectId: sourceId }
+        });
+        
+        console.log(`找到源项目节点 ${sourceNodes.length} 个，开始复制`);
+        
+        // 创建节点ID映射表，用于后续设置节点之间的依赖关系
+        const nodeIdMap = new Map();
+        
+        // 6. 复制每个节点
+        for (const sourceNode of sourceNodes) {
+          console.log(`处理源节点 ID:${sourceNode.id} 名称:${sourceNode.name}`);
+          
+          // 创建新节点
+          const newNode = new Node();
+          newNode.name = sourceNode.name;
+          newNode.order = sourceNode.order;
+          newNode.projectId = savedProject.id;  // 设置正确的项目ID
+          newNode.isPrerequisite = sourceNode.isPrerequisite;
+          newNode.isResult = sourceNode.isResult;
+          newNode.createdAt = new Date();
+          newNode.updatedAt = new Date();
+          
+          // 保存新节点并记录ID映射
+          const savedNode = await manager.save(Node, newNode);
+          nodeIdMap.set(sourceNode.id, savedNode.id);
+          
+          console.log(`新节点创建成功，ID:${savedNode.id} 关联到项目:${savedNode.projectId}`);
+          
+          // 7. 查询节点的问题
+          const sourceIssues = await manager.find(Issue, {
+            where: { nodeId: sourceNode.id }
           });
           
-          // 保存新节点
-          const savedNode = await manager.save(Node, newNode);
-          
-          // 复制issues
-          if (sourceNode.issues) {
-            for (const issue of sourceNode.issues) {
-              await manager.save(Issue, {
-                ...issue,
-                id: undefined,
-                nodeId: savedNode.id,
-                created_at: new Date(),
-                updated_at: new Date()
-              });
+          if (sourceIssues.length > 0) {
+            console.log(`找到源节点问题 ${sourceIssues.length} 个，开始复制`);
+            
+            for (const sourceIssue of sourceIssues) {
+              const newIssue = new Issue();
+              newIssue.content = sourceIssue.content;
+              newIssue.status = sourceIssue.status || 'pending';
+              newIssue.nodeId = savedNode.id;  // 直接设置nodeId而不是node对象
+              newIssue.start_date = sourceIssue.start_date;
+              newIssue.expected_end_date = sourceIssue.expected_end_date;
+              newIssue.duration_days = sourceIssue.duration_days;
+              newIssue.created_at = new Date();
+              newIssue.updated_at = new Date();
+              
+              await manager.save(Issue, newIssue);
             }
           }
           
-          // 复制materials
-          if (sourceNode.materials) {
-            for (const material of sourceNode.materials) {
-              await manager.save(Material, {
-                ...material,
-                id: undefined,
-                nodeId: savedNode.id,
-                created_at: new Date(),
-                updated_at: new Date()
-              });
+          // 8. 查询节点的材料
+          const sourceMaterials = await manager.find(Material, {
+            where: { node_id: sourceNode.id }
+          });
+          
+          if (sourceMaterials.length > 0) {
+            console.log(`找到源节点材料 ${sourceMaterials.length} 个，开始复制`);
+            
+            for (const sourceMaterial of sourceMaterials) {
+              const newMaterial = new Material();
+              newMaterial.name = sourceMaterial.name;
+              newMaterial.description = sourceMaterial.description;
+              newMaterial.url = sourceMaterial.url;
+              newMaterial.type = sourceMaterial.type;
+              newMaterial.node_id = savedNode.id;  // 直接设置node_id而不是node对象
+              newMaterial.start_date = sourceMaterial.start_date;
+              newMaterial.expected_end_date = sourceMaterial.expected_end_date;
+              newMaterial.duration_days = sourceMaterial.duration_days;
+              newMaterial.status = sourceMaterial.status;
+              newMaterial.created_at = new Date();
+              newMaterial.updated_at = new Date();
+              
+              await manager.save(Material, newMaterial);
             }
           }
           
-          // 复制deliverables
-          if (sourceNode.deliverables) {
-            for (const deliverable of sourceNode.deliverables) {
-              await manager.save(Deliverable, {
-                ...deliverable,
-                id: undefined,
-                nodeId: savedNode.id,
-                created_at: new Date(),
-                updated_at: new Date()
-              });
+          // 9. 查询节点的交付物
+          const sourceDeliverables = await manager.find(Deliverable, {
+            where: { node_id: sourceNode.id }
+          });
+          
+          if (sourceDeliverables.length > 0) {
+            console.log(`找到源节点交付物 ${sourceDeliverables.length} 个，开始复制`);
+            
+            for (const sourceDeliverable of sourceDeliverables) {
+              const newDeliverable = new Deliverable();
+              newDeliverable.description = sourceDeliverable.description;
+              newDeliverable.status = sourceDeliverable.status || 'not_started';
+              newDeliverable.node_id = savedNode.id;  // 直接设置node_id而不是node对象
+              newDeliverable.start_date = sourceDeliverable.start_date;
+              newDeliverable.expected_end_date = sourceDeliverable.expected_end_date;
+              newDeliverable.duration_days = sourceDeliverable.duration_days;
+              newDeliverable.created_at = new Date();
+              newDeliverable.updated_at = new Date();
+              
+              await manager.save(Deliverable, newDeliverable);
             }
           }
         }
+        
+        // 处理完成后，确保重新查询返回完整的项目数据
+        const completedProject = await manager.findOne(Project, {
+          where: { id: savedProject.id }
+        });
+        
+        console.log(`项目复制完成，新项目ID: ${completedProject.id}`);
+        return completedProject;
+      } catch (error) {
+        console.error('复制项目失败:', error);
+        throw error;
       }
-      
-      return savedProject;
     });
   }
 } 

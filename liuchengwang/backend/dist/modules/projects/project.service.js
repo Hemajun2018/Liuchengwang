@@ -25,12 +25,10 @@ const deliverable_entity_1 = require("../../database/entities/deliverable.entity
 const project_user_entity_1 = require("../../database/entities/project-user.entity");
 const user_entity_1 = require("../../database/entities/user.entity");
 const typeorm_3 = require("typeorm");
-const jwt_1 = require("@nestjs/jwt");
 let ProjectService = class ProjectService {
-    constructor(projectRepository, projectUserRepository, jwtService) {
+    constructor(projectRepository, projectUserRepository) {
         this.projectRepository = projectRepository;
         this.projectUserRepository = projectUserRepository;
-        this.jwtService = jwtService;
     }
     async create(createProjectDto, currentUser) {
         console.log('创建项目请求数据:', createProjectDto);
@@ -208,22 +206,11 @@ let ProjectService = class ProjectService {
         }
         const isPasswordValid = await bcrypt.compare(password, project.password);
         if (!isPasswordValid) {
-            console.log('密码不正确');
-            throw new common_1.NotFoundException('项目名或密码不正确');
+            console.log('项目密码错误');
+            throw new common_1.NotFoundException('项目密码错误');
         }
-        const payload = {
-            sub: project.id,
-            projectId: project.id,
-            projectName: project.name,
-            type: 'project_token'
-        };
-        const token = this.jwtService.sign(payload);
-        console.log('项目验证成功，生成token');
-        const { password: _, ...projectInfo } = project;
-        return {
-            ...projectInfo,
-            token
-        };
+        console.log('验证成功，返回数据:', project);
+        return project;
     }
     async updatePrerequisite(id, prerequisiteDto) {
         console.log('开始更新项目前置条件, ID:', id);
@@ -269,78 +256,228 @@ let ProjectService = class ProjectService {
         }
     }
     async copyProject(sourceId, newProjectName) {
+        console.log('开始复制项目，源ID:', sourceId, '新名称:', newProjectName);
         return await this.projectRepository.manager.transaction(async (manager) => {
-            const sourceProject = await manager.findOne(project_entity_1.Project, {
-                where: { id: sourceId },
-                relations: ['nodes', 'nodes.issues', 'nodes.materials', 'nodes.deliverables']
-            });
-            if (!sourceProject) {
-                throw new common_1.NotFoundException('源项目不存在');
-            }
-            const existingProject = await manager.findOne(project_entity_1.Project, {
-                where: { name: newProjectName }
-            });
-            if (existingProject) {
-                throw new common_1.ConflictException('项目名称已存在');
-            }
-            const newProject = manager.create(project_entity_1.Project, {
-                ...sourceProject,
-                id: undefined,
-                name: newProjectName,
-                password: sourceProject.password,
-                created_at: new Date(),
-                updated_at: new Date(),
-                status: project_entity_1.ProjectStatus.NOT_STARTED,
-                days_needed: sourceProject.days_needed,
-                created_by: sourceProject.created_by ? Number(sourceProject.created_by) : null
-            });
-            const savedProject = await manager.save(project_entity_1.Project, newProject);
-            if (sourceProject.nodes) {
-                for (const sourceNode of sourceProject.nodes) {
-                    const newNode = manager.create(node_entity_1.Node, {
-                        ...sourceNode,
-                        id: undefined,
-                        projectId: savedProject.id,
-                        created_at: new Date(),
-                        updated_at: new Date()
-                    });
+            try {
+                const sourceProject = await manager.findOne(project_entity_1.Project, {
+                    where: { id: sourceId }
+                });
+                if (!sourceProject) {
+                    throw new common_1.NotFoundException('源项目不存在');
+                }
+                const existingProject = await manager.findOne(project_entity_1.Project, {
+                    where: { name: newProjectName }
+                });
+                if (existingProject) {
+                    throw new common_1.ConflictException('项目名称已存在');
+                }
+                const newProject = new project_entity_1.Project();
+                newProject.name = newProjectName;
+                newProject.password = sourceProject.password;
+                newProject.deliverables = sourceProject.deliverables;
+                newProject.status = project_entity_1.ProjectStatus.NOT_STARTED;
+                newProject.results = sourceProject.results ? JSON.parse(JSON.stringify(sourceProject.results)) : undefined;
+                newProject.created_at = new Date();
+                newProject.updated_at = new Date();
+                newProject.created_by = sourceProject.created_by;
+                const savedProject = await manager.save(project_entity_1.Project, newProject);
+                console.log('新项目创建成功，ID:', savedProject.id);
+                const sourceNodes = await manager.find(node_entity_1.Node, {
+                    where: { projectId: sourceId }
+                });
+                console.log(`找到源项目节点 ${sourceNodes.length} 个，开始复制`);
+                const nodeIdMap = new Map();
+                for (const sourceNode of sourceNodes) {
+                    console.log(`处理源节点 ID:${sourceNode.id} 名称:${sourceNode.name}`);
+                    const newNode = new node_entity_1.Node();
+                    newNode.name = sourceNode.name;
+                    newNode.order = sourceNode.order;
+                    newNode.projectId = savedProject.id;
+                    newNode.isPrerequisite = sourceNode.isPrerequisite;
+                    newNode.isResult = sourceNode.isResult;
+                    newNode.createdAt = new Date();
+                    newNode.updatedAt = new Date();
                     const savedNode = await manager.save(node_entity_1.Node, newNode);
-                    if (sourceNode.issues) {
-                        for (const issue of sourceNode.issues) {
-                            await manager.save(issue_entity_1.Issue, {
-                                ...issue,
-                                id: undefined,
-                                nodeId: savedNode.id,
-                                created_at: new Date(),
-                                updated_at: new Date()
-                            });
+                    nodeIdMap.set(sourceNode.id, savedNode.id);
+                    console.log(`新节点创建成功，ID:${savedNode.id} 关联到项目:${savedNode.projectId}`);
+                    const sourceIssues = await manager.find(issue_entity_1.Issue, {
+                        where: { node: { id: sourceNode.id } }
+                    });
+                    if (sourceIssues.length > 0) {
+                        console.log(`找到源节点问题 ${sourceIssues.length} 个，开始复制`);
+                        for (const sourceIssue of sourceIssues) {
+                            const newIssue = new issue_entity_1.Issue();
+                            newIssue.content = sourceIssue.content;
+                            newIssue.status = sourceIssue.status || 'pending';
+                            newIssue.node = savedNode;
+                            newIssue.created_at = new Date();
+                            newIssue.updated_at = new Date();
+                            await manager.save(issue_entity_1.Issue, newIssue);
                         }
                     }
-                    if (sourceNode.materials) {
-                        for (const material of sourceNode.materials) {
-                            await manager.save(material_entity_1.Material, {
-                                ...material,
-                                id: undefined,
-                                nodeId: savedNode.id,
-                                created_at: new Date(),
-                                updated_at: new Date()
-                            });
+                    const sourceMaterials = await manager.find(material_entity_1.Material, {
+                        where: { node: { id: sourceNode.id } }
+                    });
+                    if (sourceMaterials.length > 0) {
+                        console.log(`找到源节点材料 ${sourceMaterials.length} 个，开始复制`);
+                        for (const sourceMaterial of sourceMaterials) {
+                            const newMaterial = new material_entity_1.Material();
+                            newMaterial.name = sourceMaterial.name;
+                            newMaterial.url = sourceMaterial.url;
+                            newMaterial.type = sourceMaterial.type;
+                            newMaterial.node = savedNode;
+                            newMaterial.createdAt = new Date();
+                            newMaterial.updatedAt = new Date();
+                            await manager.save(material_entity_1.Material, newMaterial);
                         }
                     }
-                    if (sourceNode.deliverables) {
-                        for (const deliverable of sourceNode.deliverables) {
-                            await manager.save(deliverable_entity_1.Deliverable, {
-                                ...deliverable,
-                                id: undefined,
-                                nodeId: savedNode.id,
-                                created_at: new Date(),
-                                updated_at: new Date()
-                            });
+                    const sourceDeliverables = await manager.find(deliverable_entity_1.Deliverable, {
+                        where: { node: { id: sourceNode.id } }
+                    });
+                    if (sourceDeliverables.length > 0) {
+                        console.log(`找到源节点交付物 ${sourceDeliverables.length} 个，开始复制`);
+                        for (const sourceDeliverable of sourceDeliverables) {
+                            const newDeliverable = new deliverable_entity_1.Deliverable();
+                            newDeliverable.description = sourceDeliverable.description;
+                            newDeliverable.status = sourceDeliverable.status;
+                            newDeliverable.node = savedNode;
+                            newDeliverable.created_at = new Date();
+                            newDeliverable.updated_at = new Date();
+                            await manager.save(deliverable_entity_1.Deliverable, newDeliverable);
                         }
                     }
                 }
+                const sourcePrerequisites = await manager.query(`SELECT * FROM prerequisites WHERE project_id = ?`, [sourceId]);
+                console.log('源项目前置条件查询结果:', JSON.stringify(sourcePrerequisites, null, 2));
+                const tableStructure = await manager.query(`DESCRIBE prerequisites`);
+                console.log('prerequisites表结构:', JSON.stringify(tableStructure, null, 2));
+                if (sourcePrerequisites.length > 0) {
+                    console.log(`找到源项目前置条件 ${sourcePrerequisites.length} 个，开始复制`);
+                    console.log('节点ID映射表内容:');
+                    for (const [oldId, newId] of nodeIdMap.entries()) {
+                        console.log(`原节点ID: ${oldId} (${typeof oldId}) -> 新节点ID: ${newId} (${typeof newId})`);
+                    }
+                    for (const prerequisite of sourcePrerequisites) {
+                        console.log('前置条件原始数据:', JSON.stringify(prerequisite, null, 2));
+                        if (prerequisite.content) {
+                            console.log('识别到项目类型的前置条件:', prerequisite.content);
+                            try {
+                                const newPrerequisite = {
+                                    project_id: savedProject.id,
+                                    content: prerequisite.content,
+                                    status: prerequisite.status || 'pending',
+                                    start_date: prerequisite.start_date,
+                                    expected_end_date: prerequisite.expected_end_date,
+                                    duration_days: prerequisite.duration_days,
+                                    created_at: new Date(),
+                                    updated_at: new Date()
+                                };
+                                const insertResult = await manager.query(`INSERT INTO prerequisites (project_id, content, status, start_date, expected_end_date, duration_days, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+                                    newPrerequisite.project_id,
+                                    newPrerequisite.content,
+                                    newPrerequisite.status,
+                                    newPrerequisite.start_date,
+                                    newPrerequisite.expected_end_date,
+                                    newPrerequisite.duration_days,
+                                    newPrerequisite.created_at,
+                                    newPrerequisite.updated_at
+                                ]);
+                                console.log('项目前置条件插入成功:', insertResult);
+                            }
+                            catch (error) {
+                                console.error('插入项目前置条件失败:', error);
+                            }
+                            continue;
+                        }
+                        let nodeId = null;
+                        let prerequisiteNodeId = null;
+                        for (const key in prerequisite) {
+                            console.log(`检查字段 ${key}: ${prerequisite[key]}`);
+                            if (key.toLowerCase().includes('node_id') || key.toLowerCase().includes('nodeid')) {
+                                if (key.toLowerCase().includes('prerequisite') || key.toLowerCase().includes('pre')) {
+                                    prerequisiteNodeId = prerequisite[key];
+                                    console.log(`找到前置节点ID字段: ${key} = ${prerequisiteNodeId}`);
+                                }
+                                else {
+                                    nodeId = prerequisite[key];
+                                    console.log(`找到节点ID字段: ${key} = ${nodeId}`);
+                                }
+                            }
+                        }
+                        if (!nodeId || !prerequisiteNodeId) {
+                            console.log('无法识别节点ID字段，尝试使用固定字段名：', prerequisite);
+                            nodeId = prerequisite.node_id;
+                            prerequisiteNodeId = prerequisite.prerequisite_node_id;
+                        }
+                        console.log(`转换前置条件 - 源节点ID: ${nodeId}, 前置节点ID: ${prerequisiteNodeId}`);
+                        const newNodeId = nodeIdMap.get(Number(nodeId));
+                        const newPrerequisiteNodeId = nodeIdMap.get(Number(prerequisiteNodeId));
+                        console.log(`映射后的ID - 新节点ID: ${newNodeId}, 新前置节点ID: ${newPrerequisiteNodeId}`);
+                        if (newNodeId && newPrerequisiteNodeId) {
+                            console.log(`准备复制前置条件: 节点${newNodeId} 依赖于 节点${newPrerequisiteNodeId}`);
+                            try {
+                                const insertResult = await manager.query(`INSERT INTO prerequisites (project_id, node_id, prerequisite_node_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?)`, [savedProject.id, newNodeId, newPrerequisiteNodeId, new Date(), new Date()]);
+                                console.log('前置条件插入成功:', insertResult);
+                                const checkInsert = await manager.query(`SELECT * FROM prerequisites WHERE project_id = ? AND node_id = ? AND prerequisite_node_id = ?`, [savedProject.id, newNodeId, newPrerequisiteNodeId]);
+                                console.log('前置条件插入检查结果:', checkInsert);
+                            }
+                            catch (error) {
+                                console.error('插入前置条件失败:', error);
+                            }
+                        }
+                        else {
+                            console.log(`跳过前置条件复制，节点ID不存在: ${nodeId} 或 ${prerequisiteNodeId}`);
+                        }
+                    }
+                }
+                else {
+                    console.log('源项目没有前置条件，无需复制');
+                }
+                console.log('尝试查找节点间的前置关系...');
+                try {
+                    const nodePrerequisites = await manager.query(`SELECT * FROM node_prerequisites WHERE node_id IN (
+              SELECT id FROM nodes WHERE project_id = ?
+            )`, [sourceId]).catch(err => {
+                        console.log('node_prerequisites表可能不存在:', err.message);
+                        return [];
+                    });
+                    if (nodePrerequisites.length > 0) {
+                        console.log(`找到节点前置关系 ${nodePrerequisites.length} 个，开始复制`);
+                        for (const relation of nodePrerequisites) {
+                            const newNodeId = nodeIdMap.get(Number(relation.node_id));
+                            const newPrerequisiteNodeId = nodeIdMap.get(Number(relation.prerequisite_node_id));
+                            if (newNodeId && newPrerequisiteNodeId) {
+                                const insertResult = await manager.query(`INSERT INTO node_prerequisites (node_id, prerequisite_node_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?)`, [newNodeId, newPrerequisiteNodeId, new Date(), new Date()]).catch(err => {
+                                    console.error('插入节点前置关系失败:', err.message);
+                                    return null;
+                                });
+                                if (insertResult) {
+                                    console.log('节点前置关系插入成功:', insertResult);
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        console.log('未找到节点前置关系或node_prerequisites表不存在');
+                    }
+                }
+                catch (error) {
+                    console.log('处理节点前置关系时出错:', error.message);
+                }
+                const completedProject = await manager.findOne(project_entity_1.Project, {
+                    where: { id: savedProject.id },
+                    relations: ['nodes']
+                });
+                console.log(`项目复制完成，新项目节点数量: ${completedProject.nodes?.length || 0}`);
+                return completedProject;
             }
-            return savedProject;
+            catch (error) {
+                console.error('复制项目失败:', error);
+                throw error;
+            }
         });
     }
 };
@@ -350,7 +487,6 @@ exports.ProjectService = ProjectService = __decorate([
     __param(0, (0, typeorm_1.InjectRepository)(project_entity_1.Project)),
     __param(1, (0, typeorm_1.InjectRepository)(project_user_entity_1.ProjectUser)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository,
-        jwt_1.JwtService])
+        typeorm_2.Repository])
 ], ProjectService);
 //# sourceMappingURL=project.service.js.map
