@@ -9,6 +9,8 @@ import { Material } from '../../database/entities/material.entity';
 import { Deliverable } from '../../database/entities/deliverable.entity';
 import { ProjectUser } from '../../database/entities/project-user.entity';
 import { RolesGuardModule } from '../../common/guards/roles-guard.module';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -20,6 +22,16 @@ import { RolesGuardModule } from '../../common/guards/roles-guard.module';
       Deliverable,
       ProjectUser
     ]),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET') || 'liuchengwang_secret_key',
+        signOptions: {
+          expiresIn: '7d', // 令牌有效期7天
+        },
+      }),
+    }),
     RolesGuardModule,
   ],
   controllers: [ProjectController],

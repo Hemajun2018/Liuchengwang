@@ -18,6 +18,8 @@ const material_entity_1 = require("../../database/entities/material.entity");
 const deliverable_entity_1 = require("../../database/entities/deliverable.entity");
 const project_user_entity_1 = require("../../database/entities/project-user.entity");
 const roles_guard_module_1 = require("../../common/guards/roles-guard.module");
+const jwt_1 = require("@nestjs/jwt");
+const config_1 = require("@nestjs/config");
 let ProjectModule = class ProjectModule {
 };
 exports.ProjectModule = ProjectModule;
@@ -32,6 +34,16 @@ exports.ProjectModule = ProjectModule = __decorate([
                 deliverable_entity_1.Deliverable,
                 project_user_entity_1.ProjectUser
             ]),
+            jwt_1.JwtModule.registerAsync({
+                imports: [config_1.ConfigModule],
+                inject: [config_1.ConfigService],
+                useFactory: (configService) => ({
+                    secret: configService.get('JWT_SECRET') || 'liuchengwang_secret_key',
+                    signOptions: {
+                        expiresIn: '7d',
+                    },
+                }),
+            }),
             roles_guard_module_1.RolesGuardModule,
         ],
         controllers: [project_controller_1.ProjectController],

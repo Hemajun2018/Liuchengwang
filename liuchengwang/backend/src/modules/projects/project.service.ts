@@ -11,6 +11,7 @@ import { ProjectUser } from '../../database/entities/project-user.entity';
 import { UserRole } from '../../database/entities/user.entity';
 import { Brackets } from 'typeorm';
 import { Prerequisite } from '../../database/entities/prerequisite.entity';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class ProjectService {
@@ -18,7 +19,8 @@ export class ProjectService {
     @InjectRepository(Project)
     private projectRepository: Repository<Project>,
     @InjectRepository(ProjectUser)
-    private projectUserRepository: Repository<ProjectUser>
+    private projectUserRepository: Repository<ProjectUser>,
+    private readonly jwtService: JwtService
   ) {}
 
   async create(createProjectDto: {
@@ -249,6 +251,7 @@ export class ProjectService {
 
   async verifyProject(name: string, password: string) {
     console.log('验证项目密码，项目名:', name);
+    console.log('密码:', password ? '已提供' : '未提供');
     
     const project = await this.projectRepository.findOne({
       where: { name }
@@ -259,14 +262,35 @@ export class ProjectService {
       throw new NotFoundException('项目不存在');
     }
 
+    console.log('找到项目:', project.id);
+    
     const isPasswordValid = await bcrypt.compare(password, project.password);
+    console.log('密码验证结果:', isPasswordValid);
+    
     if (!isPasswordValid) {
       console.log('项目密码错误');
       throw new NotFoundException('项目密码错误');
     }
 
-    console.log('验证成功，返回数据:', project);
-    return project;
+    // 生成JWT令牌
+    const payload = { 
+      id: project.id,
+      name: project.name,
+      type: 'project'
+    };
+    
+    console.log('准备生成token，payload:', payload);
+    const token = this.jwtService.sign(payload);
+    console.log('项目验证成功，生成token:', token.substring(0, 20) + '...');
+
+    // 返回项目信息和令牌
+    const result = {
+      ...project,
+      token
+    };
+    
+    console.log('返回数据包含token:', !!result.token);
+    return result;
   }
 
   async updatePrerequisite(id: string, prerequisiteDto: {

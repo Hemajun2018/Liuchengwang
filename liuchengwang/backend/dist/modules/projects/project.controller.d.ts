@@ -24,7 +24,26 @@ export declare class ProjectController {
     verifyProject(data: {
         name: string;
         password: string;
-    }): Promise<Project>;
+    }): Promise<{
+        token: string;
+        id: string;
+        name: string;
+        password: string;
+        deliverables: string;
+        status: import("../../database/entities/project.entity").ProjectStatus;
+        start_time: Date;
+        end_time: Date;
+        days_needed: number;
+        results: Array<{
+            id?: number;
+            description: string;
+        }>;
+        created_by: number;
+        created_at: Date;
+        updated_at: Date;
+        nodes: import("../../database/entities").Node[];
+        projectUsers: import("../../database/entities/project-user.entity").ProjectUser[];
+    }>;
     updatePrerequisite(id: string, prerequisiteDto: {
         deliverables: string;
         status: number;

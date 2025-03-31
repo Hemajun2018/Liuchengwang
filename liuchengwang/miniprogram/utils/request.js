@@ -205,6 +205,7 @@ const request = (options) => {
 
   // 获取token
   const token = wx.getStorageSync('token');
+  console.log('请求API时token状态:', token ? '存在' : '不存在', options.url);
 
   // 合并默认header
   const header = {
@@ -215,6 +216,9 @@ const request = (options) => {
   // 如果有token,添加到header
   if (token) {
     header['Authorization'] = `Bearer ${token}`;
+    console.log('添加Authorization头:', `Bearer ${token.substring(0, 20)}...`);
+  } else {
+    console.log('无token，请求将不包含Authorization头');
   }
 
   return new Promise((resolve, reject) => {

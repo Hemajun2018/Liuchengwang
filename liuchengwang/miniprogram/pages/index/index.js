@@ -90,12 +90,14 @@ Page({
           if (res.data.token) {
             // 使用token管理工具保存token
             tokenManager.saveToken(res.data.token);
-            console.log('已保存登录令牌');
+            console.log('已保存后端返回的登录令牌');
           } else {
-            // 为了确保授权机制正常工作，我们创建一个临时token
-            const tempToken = `project_${res.data.id}_${new Date().getTime()}`;
-            tokenManager.saveToken(tempToken, 12 * 60 * 60); // 临时token有效期12小时
-            console.log('已创建临时令牌');
+            console.log('后端未返回token，请检查API响应');
+            wx.showToast({
+              title: '登录异常，请联系管理员',
+              icon: 'none'
+            });
+            return;
           }
           
           // 预加载项目相关数据

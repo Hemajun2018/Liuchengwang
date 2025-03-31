@@ -20,13 +20,7 @@ App({
       // 设置全局token
       this.globalData.token = token;
     } else {
-      // 如果token无效但有项目信息，尝试创建临时token
-      if (projectInfo && projectInfo.id) {
-        const tempToken = `project_${projectInfo.id}_${new Date().getTime()}`;
-        tokenManager.saveToken(tempToken, 12 * 60 * 60); // 临时token有效期12小时
-        this.globalData.token = tempToken;
-        console.log('创建临时token');
-      }
+      console.log('无有效token，需要登录');
     }
     
     // 初始化全局数据

@@ -26,10 +26,12 @@ const project_user_entity_1 = require("../../database/entities/project-user.enti
 const user_entity_1 = require("../../database/entities/user.entity");
 const typeorm_3 = require("typeorm");
 const prerequisite_entity_1 = require("../../database/entities/prerequisite.entity");
+const jwt_1 = require("@nestjs/jwt");
 let ProjectService = class ProjectService {
-    constructor(projectRepository, projectUserRepository) {
+    constructor(projectRepository, projectUserRepository, jwtService) {
         this.projectRepository = projectRepository;
         this.projectUserRepository = projectUserRepository;
+        this.jwtService = jwtService;
     }
     async create(createProjectDto, currentUser) {
         console.log('创建项目请求数据:', createProjectDto);
@@ -198,6 +200,7 @@ let ProjectService = class ProjectService {
     }
     async verifyProject(name, password) {
         console.log('验证项目密码，项目名:', name);
+        console.log('密码:', password ? '已提供' : '未提供');
         const project = await this.projectRepository.findOne({
             where: { name }
         });
@@ -205,13 +208,27 @@ let ProjectService = class ProjectService {
             console.log('项目不存在');
             throw new common_1.NotFoundException('项目不存在');
         }
+        console.log('找到项目:', project.id);
         const isPasswordValid = await bcrypt.compare(password, project.password);
+        console.log('密码验证结果:', isPasswordValid);
         if (!isPasswordValid) {
             console.log('项目密码错误');
             throw new common_1.NotFoundException('项目密码错误');
         }
-        console.log('验证成功，返回数据:', project);
-        return project;
+        const payload = {
+            id: project.id,
+            name: project.name,
+            type: 'project'
+        };
+        console.log('准备生成token，payload:', payload);
+        const token = this.jwtService.sign(payload);
+        console.log('项目验证成功，生成token:', token.substring(0, 20) + '...');
+        const result = {
+            ...project,
+            token
+        };
+        console.log('返回数据包含token:', !!result.token);
+        return result;
     }
     async updatePrerequisite(id, prerequisiteDto) {
         console.log('开始更新项目前置条件, ID:', id);
@@ -395,6 +412,7 @@ exports.ProjectService = ProjectService = __decorate([
     __param(0, (0, typeorm_1.InjectRepository)(project_entity_1.Project)),
     __param(1, (0, typeorm_1.InjectRepository)(project_user_entity_1.ProjectUser)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository])
+        typeorm_2.Repository,
+        jwt_1.JwtService])
 ], ProjectService);
 //# sourceMappingURL=project.service.js.map
