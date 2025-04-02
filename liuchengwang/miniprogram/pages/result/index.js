@@ -38,14 +38,125 @@ Page({
   // 页面显示时频繁刷新数据
   onShow() {
     if (this.data.projectId) {
-      const now = Date.now();
       console.log('成果页面显示，刷新数据');
+      // 直接从服务器获取最新数据
+      this.loadLatestResults();
+    }
+  },
+  
+  // 加载最新成果数据
+  async loadLatestResults() {
+    console.log('从服务器获取最新成果数据');
+    this.setData({ loading: true });
+    
+    try {
+      // 直接获取项目数据，而不是节点数据
+      const projectData = await request({
+        url: `/api/projects/${this.data.projectId}`,
+        method: 'GET'
+      });
       
-      // 如果距离上次刷新超过2秒，则尝试刷新数据
-      if (now - this.data.lastRefreshTime > 2000) {
-        this.checkDataUpdates();
-        this.setData({ lastRefreshTime: now });
+      console.log('获取到项目数据:', projectData);
+      
+      // 项目数据中直接包含results字段
+      if (projectData && projectData.results) {
+        console.log('获取到成果数据:', projectData.results);
+        
+        // 更新项目信息
+        const projectInfo = this.data.projectInfo || {};
+        projectInfo.results = projectData.results;
+        
+        // 更新页面数据
+        this.setData({
+          projectInfo: projectInfo,
+          loading: false,
+          error: null
+        });
+        
+        // 更新本地存储
+        wx.setStorageSync('projectInfo', projectInfo);
+      } else {
+        console.log('项目中没有成果数据');
+        this.setData({
+          loading: false,
+          error: null
+        });
       }
+    } catch (error) {
+      console.error('获取项目数据失败:', error);
+      this.setData({ 
+        loading: false,
+        error: '获取成果数据失败'
+      });
+    }
+  },
+  
+  // 从服务器获取最新的成果数据
+  async fetchLatestResultsFromServer() {
+    console.log('从服务器获取最新成果数据');
+    
+    try {
+      // 获取最新节点数据
+      const nodes = await request({
+        url: `/api/projects/${this.data.projectId}/nodes`,
+        method: 'GET'
+      });
+      
+      console.log('获取到最新节点数据:', nodes);
+      
+      // 缓存节点数据
+      cacheManager.setCache(
+        cacheManager.createProjectCacheKey(this.data.projectId, 'nodes'),
+        nodes
+      );
+      
+      // 从节点中提取成果数据
+      this.extractAndSaveResults(nodes);
+    } catch (error) {
+      console.error('获取最新节点数据失败:', error);
+      // 失败时不显示错误提示，仍使用已有数据
+    }
+  },
+  
+  // 从节点中提取成果数据并保存
+  extractAndSaveResults(nodes) {
+    if (!nodes || nodes.length === 0) return;
+    
+    // 从节点中查找关联的成果数据
+    const results = [];
+    nodes.forEach(node => {
+      if (node.results && node.results.length > 0) {
+        results.push(...node.results);
+      }
+    });
+    
+    if (results.length > 0) {
+      console.log('从节点中提取的成果数据:', results);
+      
+      // 更新项目信息
+      const projectInfo = wx.getStorageSync('projectInfo') || {};
+      projectInfo.results = results;
+      
+      // 保存到本地存储
+      wx.setStorageSync('projectInfo', projectInfo);
+      
+      // 更新当前页面的数据
+      if (this.data.projectInfo) {
+        const updatedProjectInfo = {
+          ...this.data.projectInfo,
+          results: results
+        };
+        
+        this.setData({
+          projectInfo: updatedProjectInfo,
+          error: null,
+          loading: false
+        });
+      }
+      
+      // 缓存成果数据
+      const resultsCacheKey = cacheManager.createProjectCacheKey(this.data.projectId, 'results');
+      cacheManager.setCache(resultsCacheKey, results);
     }
   },
   
@@ -113,8 +224,8 @@ Page({
         loading: false
       });
       
-      // 从全局元素中提取成果
-      this.extractFromGlobalElements();
+      // 直接从服务器获取最新成果数据
+      this.fetchLatestResultsFromServer();
       return;
     }
     
@@ -127,13 +238,15 @@ Page({
         loading: false
       });
       
-      // 从全局元素中提取成果
-      this.extractFromGlobalElements();
+      // 直接从服务器获取最新成果数据
+      this.fetchLatestResultsFromServer();
       return;
     }
     
     // 3. 如果没有项目信息，直接从全局元素创建模拟项目
     if (this.tryUseGlobalElements()) {
+      // 直接从服务器获取最新成果数据
+      this.fetchLatestResultsFromServer();
       return;
     }
     
@@ -175,8 +288,8 @@ Page({
         error: null
       });
       
-      // 从全局元素中提取成果
-      this.extractFromGlobalElements();
+      // 直接从服务器获取最新成果数据
+      this.fetchLatestResultsFromServer();
     } catch (err) {
       console.error('请求项目信息失败:', err);
       
@@ -341,12 +454,9 @@ Page({
     const now = new Date();
     const dateStr = this.formatDate(now);
     
-    // 创建新成果对象
+    // 创建新成果对象 - 只需要description字段
     const newResult = {
-      name: `新成果 ${dateStr}`,
-      description: `新增成果项描述 ${dateStr}`,
-      created_at: dateStr,
-      status: 'not_started'
+      description: `新增成果项描述 ${dateStr}`
     };
     
     try {
@@ -358,24 +468,15 @@ Page({
       
       // 调用后端API更新项目成果
       await request({
-        url: `/api/projects/${this.data.projectId}`,
+        url: `/api/projects/${this.data.projectId}/result`,
         method: 'PATCH',
         data: {
           results: updatedResults
         }
       });
       
-      // 更新项目信息
-      const updatedProjectInfo = { ...this.data.projectInfo, results: updatedResults };
-      
-      // 更新页面数据
-      this.setData({ 
-        projectInfo: updatedProjectInfo,
-        error: null
-      });
-      
-      // 更新本地存储
-      wx.setStorageSync('projectInfo', updatedProjectInfo);
+      // 立即重新加载成果数据
+      await this.loadLatestResults();
       
       // 显示成功提示
       wx.showToast({
@@ -400,28 +501,19 @@ Page({
       title: '刷新中...',
     });
     
-    // 检查跟新全局数据
-    this.checkDataUpdates();
-    
-    // 返回到流程页面，重新加载数据后再回来
-    wx.navigateBack({
-      success: () => {
-        // 标记需要刷新
-        app.globalData.needRefreshFlow = true;
-        
-        setTimeout(() => {
-          // 延迟导航回本页面
-          wx.navigateTo({
-            url: `/pages/result/result?id=${this.data.projectInfo.id || this.data.projectId}`,
-            complete: () => {
-              wx.hideLoading();
-            }
-          });
-        }, 500);
-      },
-      fail: () => {
-        wx.hideLoading();
-      }
+    // 直接加载最新数据
+    this.loadLatestResults().then(() => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '刷新成功',
+        icon: 'success'
+      });
+    }).catch(() => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '刷新失败',
+        icon: 'none'
+      });
     });
   },
   

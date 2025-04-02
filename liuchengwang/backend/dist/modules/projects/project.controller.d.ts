@@ -28,7 +28,6 @@ export declare class ProjectController {
         token: string;
         id: string;
         name: string;
-        password: string;
         deliverables: string;
         status: import("../../database/entities/project.entity").ProjectStatus;
         start_time: Date;
@@ -42,7 +41,6 @@ export declare class ProjectController {
         created_at: Date;
         updated_at: Date;
         nodes: import("../../database/entities").Node[];
-        projectUsers: import("../../database/entities/project-user.entity").ProjectUser[];
     }>;
     updatePrerequisite(id: string, prerequisiteDto: {
         deliverables: string;

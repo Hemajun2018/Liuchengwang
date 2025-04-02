@@ -201,9 +201,11 @@ let ProjectService = class ProjectService {
     async verifyProject(name, password) {
         console.log('验证项目密码，项目名:', name);
         console.log('密码:', password ? '已提供' : '未提供');
-        const project = await this.projectRepository.findOne({
-            where: { name }
-        });
+        const project = await this.projectRepository
+            .createQueryBuilder('project')
+            .leftJoinAndSelect('project.projectUsers', 'projectUsers')
+            .where('project.name = :name', { name })
+            .getOne();
         if (!project) {
             console.log('项目不存在');
             throw new common_1.NotFoundException('项目不存在');
@@ -215,6 +217,10 @@ let ProjectService = class ProjectService {
             console.log('项目密码错误');
             throw new common_1.NotFoundException('项目密码错误');
         }
+        if (!project.projectUsers || project.projectUsers.length === 0) {
+            console.log('项目没有关联的用户');
+            throw new common_1.NotFoundException('项目访问权限错误');
+        }
         const payload = {
             id: project.id,
             name: project.name,
@@ -223,8 +229,9 @@ let ProjectService = class ProjectService {
         console.log('准备生成token，payload:', payload);
         const token = this.jwtService.sign(payload);
         console.log('项目验证成功，生成token:', token.substring(0, 20) + '...');
+        const { password: _, projectUsers: __, ...projectInfo } = project;
         const result = {
-            ...project,
+            ...projectInfo,
             token
         };
         console.log('返回数据包含token:', !!result.token);

@@ -44,7 +44,7 @@ Page({
   
   loadProjectInfo() {
     console.log('加载项目信息');
-    this.setData({ loading: true });
+    this.setData({ loading: true, nodes: [] });
     
     // 生成缓存键
     const cacheKey = cacheManager.createProjectCacheKey(this.data.projectId, 'info');
@@ -57,9 +57,13 @@ Page({
       const projectInfo = cachedInfo || localProjectInfo;
       console.log('从本地获取项目信息:', projectInfo);
       
+      // 检查prerequisites数据
+      this.loadPrerequisites(projectInfo);
+      
       this.setData({
         projectInfo,
-        hasPrerequisite: !!projectInfo.deliverables,
+        // 即使deliverables为null，也显示前置条件节点
+        hasPrerequisite: true,
         hasResult: !!(projectInfo.results && projectInfo.results.length > 0),
         loading: false
       });
@@ -103,9 +107,13 @@ Page({
       wx.setStorageSync('projectInfo', projectInfo);
       
       if (!isSilent) {
+        // 检查prerequisites数据
+        this.loadPrerequisites(projectInfo);
+        
         this.setData({
           projectInfo,
-          hasPrerequisite: !!projectInfo.deliverables,
+          // 即使deliverables为null，也显示前置条件节点
+          hasPrerequisite: true,
           hasResult: !!(projectInfo.results && projectInfo.results.length > 0),
           loading: false
         });
@@ -123,7 +131,8 @@ Page({
           this.setData({ 
             loading: false,
             projectInfo: localProjectInfo,
-            hasPrerequisite: !!localProjectInfo.deliverables,
+            // 即使deliverables为null，也显示前置条件节点
+            hasPrerequisite: true,
             hasResult: !!(localProjectInfo.results && localProjectInfo.results.length > 0)
           });
           
@@ -153,6 +162,22 @@ Page({
         }
       }
     });
+  },
+  
+  // 加载前置条件
+  loadPrerequisites(projectInfo) {
+    console.log('检查前置条件数据');
+    
+    // 确保prerequisites字段存在
+    if (!projectInfo.prerequisites) {
+      projectInfo.prerequisites = [];
+    }
+    
+    // 记录前置条件数据状态
+    console.log('前置条件数据:', projectInfo.prerequisites.length > 0 ? '已存在' : '为空');
+    
+    // 不再请求不存在的API，直接返回
+    return;
   },
   
   loadNodeList(isSilent = false) {
@@ -255,6 +280,22 @@ Page({
       
       // 保存到本地存储
       wx.setStorageSync('projectInfo', projectInfo);
+      
+      // 更新当前项目信息
+      if (this.data.projectInfo) {
+        const updatedProjectInfo = {
+          ...this.data.projectInfo,
+          results: results
+        };
+        
+        this.setData({
+          projectInfo: updatedProjectInfo
+        });
+      }
+      
+      // 缓存成果数据
+      const resultsCacheKey = cacheManager.createProjectCacheKey(this.data.projectId, 'results');
+      cacheManager.setCache(resultsCacheKey, results);
     }
   },
   

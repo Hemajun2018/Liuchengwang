@@ -12,9 +12,8 @@
   <!-- 流程图区域 -->
   <view class="flow-chart-container">
     <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
-    <view class="empty-tip" wx:elif="{{nodes.length === 0}}">暂无节点数据</view>
     
-    <view class="flow-chart" wx:else>
+    <view class="flow-chart" wx:elif="{{hasPrerequisite || nodes.length > 0}}">
       <!-- 前置条件节点 -->
       <view class="node-container prerequisite-node" bindtap="goToPrerequisiteDetail">
         <view class="node-box {{hasPrerequisite ? 'active' : ''}}">
@@ -24,8 +23,14 @@
         </view>
       </view>
       
-      <!-- 前置条件到第一组问题和材料的连接线 -->
-      <view class="connector-line vertical-connector">
+      <!-- 没有节点时显示提示信息 -->
+      <view class="node-tip" wx:if="{{nodes.length === 0}}">
+        <view class="tip-icon">ℹ️</view>
+        <view class="tip-text">尚未添加节点，请在后台添加节点</view>
+      </view>
+      
+      <!-- 前置条件到第一组问题和材料的连接线，只在有节点时显示 -->
+      <view class="connector-line vertical-connector" wx:if="{{nodes.length > 0}}">
         <view class="connector-arrow"></view>
       </view>
       
@@ -83,8 +88,8 @@
         <view class="connector-arrow"></view>
       </view>
       
-      <!-- 成果节点 -->
-      <view class="node-container result-node" bindtap="goToResultDetail">
+      <!-- 成果节点，只在有节点时显示 -->
+      <view class="node-container result-node" bindtap="goToResultDetail" wx:if="{{nodes.length > 0}}">
         <view class="node-box {{hasResult ? 'active' : ''}}">
           <view class="node-icon">🏆</view>
           <view class="node-title">成果</view>
@@ -92,6 +97,8 @@
         </view>
       </view>
     </view>
+    
+    <view class="empty-tip" wx:else>暂无项目数据</view>
   </view>
   
   <!-- 底部操作区 -->

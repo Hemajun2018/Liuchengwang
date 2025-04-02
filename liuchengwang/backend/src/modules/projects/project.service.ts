@@ -253,9 +253,12 @@ export class ProjectService {
     console.log('验证项目密码，项目名:', name);
     console.log('密码:', password ? '已提供' : '未提供');
     
-    const project = await this.projectRepository.findOne({
-      where: { name }
-    });
+    // 查找项目，同时加载project_users关联
+    const project = await this.projectRepository
+      .createQueryBuilder('project')
+      .leftJoinAndSelect('project.projectUsers', 'projectUsers')
+      .where('project.name = :name', { name })
+      .getOne();
 
     if (!project) {
       console.log('项目不存在');
@@ -272,6 +275,12 @@ export class ProjectService {
       throw new NotFoundException('项目密码错误');
     }
 
+    // 检查项目是否有关联的用户
+    if (!project.projectUsers || project.projectUsers.length === 0) {
+      console.log('项目没有关联的用户');
+      throw new NotFoundException('项目访问权限错误');
+    }
+
     // 生成JWT令牌
     const payload = { 
       id: project.id,
@@ -283,9 +292,10 @@ export class ProjectService {
     const token = this.jwtService.sign(payload);
     console.log('项目验证成功，生成token:', token.substring(0, 20) + '...');
 
-    // 返回项目信息和令牌
+    // 返回项目信息和令牌，但不包含敏感信息
+    const { password: _, projectUsers: __, ...projectInfo } = project;
     const result = {
-      ...project,
+      ...projectInfo,
       token
     };
     

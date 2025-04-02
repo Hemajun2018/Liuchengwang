@@ -58,12 +58,16 @@
         <view class="header-icon">🏆</view>
         <text class="card-title">成果列表</text>
       </view>
-      <text class="result-count">共 {{projectInfo.results.length || 0}} 项</text>
+      <view class="header-right">
+        <text class="result-count">共 {{projectInfo.results.length || 0}} 项</text>
+        <view class="refresh-btn" bindtap="refreshResults">🔄</view>
+      </view>
     </view>
     
     <view class="empty-tip" wx:if="{{!projectInfo.results || projectInfo.results.length === 0}}">
       <view class="empty-icon">📝</view>
       <view class="empty-text">暂无成果记录</view>
+      <view class="empty-subtext">下拉可刷新数据</view>
     </view>
     
     <view class="result-list" wx:else>
@@ -74,13 +78,5 @@
         </view>
       </view>
     </view>
-  </view>
-  
-  <!-- 底部操作区 -->
-  <view class="action-buttons">
-    <button class="action-btn back-btn" bindtap="goBack">
-      <text class="btn-icon">↩️</text>
-      <text class="btn-text">返回流程图</text>
-    </button>
   </view>
 </view> 

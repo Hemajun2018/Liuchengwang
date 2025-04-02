@@ -29,7 +29,6 @@ export declare class ProjectService {
         token: string;
         id: string;
         name: string;
-        password: string;
         deliverables: string;
         status: ProjectStatus;
         start_time: Date;
@@ -43,7 +42,6 @@ export declare class ProjectService {
         created_at: Date;
         updated_at: Date;
         nodes: Node[];
-        projectUsers: ProjectUser[];
     }>;
     updatePrerequisite(id: string, prerequisiteDto: {
         deliverables: string;

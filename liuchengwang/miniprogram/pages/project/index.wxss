@@ -490,4 +490,26 @@ page {
 
 .btn-text {
   font-size: 32rpx;
+}
+
+/* 节点提示样式 */
+.node-tip {
+  margin: 30rpx 0;
+  padding: 20rpx;
+  background-color: #f8f9fa;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.tip-icon {
+  font-size: 36rpx;
+  margin-right: 12rpx;
+}
+
+.tip-text {
+  font-size: 28rpx;
+  color: #666;
 } 
