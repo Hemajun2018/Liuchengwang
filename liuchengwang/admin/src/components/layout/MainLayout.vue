@@ -32,7 +32,7 @@ const menuItems = computed(() => {
     }
     
     // 如果菜单项有角色要求，检查用户角色是否满足要求
-    return item.meta.requiredRoles.includes(userRole);
+    return (item.meta.requiredRoles as string[]).includes(userRole);
   }).map(item => {
     // 项目管理使用绝对路径
     if (item.path === 'projects') {

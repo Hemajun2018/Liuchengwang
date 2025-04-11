@@ -125,8 +125,8 @@
               <issue-list
                 :issues="getNodeIssues(node.id)"
                 :nodeId="node.id"
-                @detail="(issue) => handleIssueDetail(node.id, issue)"
-                @edit="(issue) => handleEditIssue(node.id, issue)"
+                @detail="(issue) => handleIssueDetail(node.id, issue as Issue)"
+                @edit="(issue) => handleEditIssue(node.id, issue as Issue)"
                 @delete="handleDeleteIssue"
               />
             </div>

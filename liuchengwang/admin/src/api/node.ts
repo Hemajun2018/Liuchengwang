@@ -39,6 +39,7 @@ export interface Node {
   issues: Issue[];
   materials: Material[];
   deliverables: any[];
+  progresses: Progress[];
 }
 
 export interface Issue {

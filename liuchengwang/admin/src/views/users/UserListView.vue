@@ -184,9 +184,9 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import { getUserList, updateUser, deleteUser, updatePassword } from '../../api/user';
-import { register } from '../../api/auth';
-import type { User } from '../../types/api';
+import { getUserList, updateUser, deleteUser, updatePassword } from '@/api/user';
+import { register } from '@/api/auth';
+import type { User, RegisterParams } from '@/types/api';
 import { UserRole } from '../../types/api';
 import RoleTag from '../../components/RoleTag.vue';
 
@@ -375,11 +375,11 @@ const handleSubmit = async () => {
         } else {
           // 创建用户
           const { username, password, realName, email, phone, role } = userData;
-          const registerData = {
+          const registerData: RegisterParams = {
             username,
             password,
             realName,
-            role,
+            role: role as 'admin' | 'employee',
             ...(email ? { email } : {}),
             ...(phone ? { phone } : {})
           };
