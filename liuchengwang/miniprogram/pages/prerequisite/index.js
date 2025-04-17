@@ -85,7 +85,7 @@ Page({
     } else {
       // 如果本地没有，则从服务器获取
       wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
+        url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}`,
         method: 'GET',
         success: (res) => {
           if (res.statusCode === 200) {

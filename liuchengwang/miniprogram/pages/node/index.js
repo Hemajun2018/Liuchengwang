@@ -47,7 +47,7 @@ Page({
     this.setData({ loading: true });
     
     wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
+      url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
       method: 'GET',
       success: (res) => {
         if (res.statusCode === 200) {
@@ -87,7 +87,7 @@ Page({
   // 加载问题列表
   loadIssues() {
     wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}/issues`,
+      url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}/nodes/${this.data.nodeId}/issues`,
       method: 'GET',
       success: (res) => {
         if (res.statusCode === 200) {
@@ -105,7 +105,7 @@ Page({
   // 加载材料列表
   loadMaterials() {
     wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}/materials`,
+      url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}/nodes/${this.data.nodeId}/materials`,
       method: 'GET',
       success: (res) => {
         if (res.statusCode === 200) {

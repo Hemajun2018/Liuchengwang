@@ -8,7 +8,6 @@
     <view class="node-info">
       <view class="node-icon">📍</view>
       <view class="node-name">{{nodeName}}</view>
-      <view class="node-status status-{{nodeStatus}}">{{nodeStatusText}}</view>
     </view>
   </view>
   

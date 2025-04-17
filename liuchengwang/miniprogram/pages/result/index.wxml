@@ -1,4 +1,4 @@
-<view class="container">
+<view class="result-container">
   <!-- 祝贺横幅，始终显示 -->
   <view class="congratulation-banner">
     <view class="congratulation-icon">🎉</view>

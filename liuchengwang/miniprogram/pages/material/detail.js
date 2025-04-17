@@ -1,4 +1,5 @@
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -51,16 +52,17 @@ Page({
         projectName: projectInfo.name
       });
     } else {
-      wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
-        method: 'GET',
-        success: (res) => {
-          if (res.statusCode === 200) {
-            this.setData({ 
-              projectName: res.data.name
-            });
-          }
-        }
+      request({
+        url: `/projects/${this.data.projectId}`,
+        method: 'GET'
+      })
+      .then(data => {
+        this.setData({ 
+          projectName: data.name
+        });
+      })
+      .catch(err => {
+        console.error('获取项目信息失败:', err);
       });
     }
   },
@@ -69,79 +71,71 @@ Page({
   loadNodeAndMaterials() {
     this.setData({ loading: true });
     
-    wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const nodeInfo = res.data;
-          console.log('获取到的节点信息:', nodeInfo);
+    request({
+      url: `/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
+      method: 'GET'
+    })
+    .then(data => {
+      const nodeInfo = data;
+      console.log('获取到的节点信息:', nodeInfo);
+      
+      // 处理材料数据，确保日期字段正确
+      let processedMaterials = [];
+      if (nodeInfo.materials && nodeInfo.materials.length > 0) {
+        processedMaterials = nodeInfo.materials.map(material => {
+          // 检查并处理日期字段
+          const processedMaterial = {...material};
           
-          // 处理材料数据，确保日期字段正确
-          let processedMaterials = [];
-          if (nodeInfo.materials && nodeInfo.materials.length > 0) {
-            processedMaterials = nodeInfo.materials.map(material => {
-              // 检查并处理日期字段
-              const processedMaterial = {...material};
-              
-              // 处理开始时间
-              if (!processedMaterial.start_date && processedMaterial.startDate) {
-                processedMaterial.start_date = processedMaterial.startDate;
-              } else if (!processedMaterial.start_date && processedMaterial.startTime) {
-                processedMaterial.start_date = processedMaterial.startTime;
-              }
-              
-              // 处理结束时间
-              if (!processedMaterial.expected_end_date && processedMaterial.expectedEndDate) {
-                processedMaterial.expected_end_date = processedMaterial.expectedEndDate;
-              } else if (!processedMaterial.expected_end_date && processedMaterial.endTime) {
-                processedMaterial.expected_end_date = processedMaterial.endTime;
-              }
-              
-              // 处理完成天数
-              if (!processedMaterial.duration_days && processedMaterial.durationDays) {
-                processedMaterial.duration_days = processedMaterial.durationDays;
-              }
-              
-              // 预先格式化日期
-              processedMaterial.formattedStartDate = this.formatDate(processedMaterial.start_date);
-              processedMaterial.formattedEndDate = this.formatDate(processedMaterial.expected_end_date);
-              
-              // 测试：检查材料状态
-              console.log('材料ID:', processedMaterial.id, '状态值:', processedMaterial.status, '类型:', typeof processedMaterial.status);
-              console.log('状态文本测试:', this.getMaterialStatusText(processedMaterial.status));
-              
-              // 预先计算状态文本并存储在材料对象中
-              processedMaterial.statusText = this.getMaterialStatusText(processedMaterial.status);
-              console.log('预存的状态文本:', processedMaterial.statusText);
-              
-              return processedMaterial;
-            });
-            
-            console.log('处理后的第一个材料数据:', processedMaterials[0]);
+          // 处理开始时间
+          if (!processedMaterial.start_date && processedMaterial.startDate) {
+            processedMaterial.start_date = processedMaterial.startDate;
+          } else if (!processedMaterial.start_date && processedMaterial.startTime) {
+            processedMaterial.start_date = processedMaterial.startTime;
           }
           
-          this.setData({
-            nodeName: nodeInfo.name || '',
-            materials: processedMaterials,
-            loading: false
-          });
-        } else {
-          wx.showToast({
-            title: '获取节点信息失败',
-            icon: 'none'
-          });
-          this.setData({ loading: false });
-        }
-      },
-      fail: (err) => {
-        console.error('请求节点信息失败:', err);
-        wx.showToast({
-          title: '网络请求失败',
-          icon: 'none'
+          // 处理结束时间
+          if (!processedMaterial.expected_end_date && processedMaterial.expectedEndDate) {
+            processedMaterial.expected_end_date = processedMaterial.expectedEndDate;
+          } else if (!processedMaterial.expected_end_date && processedMaterial.endTime) {
+            processedMaterial.expected_end_date = processedMaterial.endTime;
+          }
+          
+          // 处理完成天数
+          if (!processedMaterial.duration_days && processedMaterial.durationDays) {
+            processedMaterial.duration_days = processedMaterial.durationDays;
+          }
+          
+          // 预先格式化日期
+          processedMaterial.formattedStartDate = this.formatDate(processedMaterial.start_date);
+          processedMaterial.formattedEndDate = this.formatDate(processedMaterial.expected_end_date);
+          
+          // 测试：检查材料状态
+          console.log('材料ID:', processedMaterial.id, '状态值:', processedMaterial.status, '类型:', typeof processedMaterial.status);
+          console.log('状态文本测试:', this.getMaterialStatusText(processedMaterial.status));
+          
+          // 预先计算状态文本并存储在材料对象中
+          processedMaterial.statusText = this.getMaterialStatusText(processedMaterial.status);
+          console.log('预存的状态文本:', processedMaterial.statusText);
+          
+          return processedMaterial;
         });
-        this.setData({ loading: false });
+        
+        console.log('处理后的第一个材料数据:', processedMaterials[0]);
       }
+      
+      this.setData({
+        nodeName: nodeInfo.name || '',
+        materials: processedMaterials,
+        loading: false
+      });
+    })
+    .catch(err => {
+      console.error('请求节点信息失败:', err);
+      wx.showToast({
+        title: '获取节点信息失败',
+        icon: 'none'
+      });
+      this.setData({ loading: false });
     });
   },
   
@@ -215,8 +209,10 @@ Page({
     return result;
   },
   
-  // 返回流程图
+  // 返回上一页
   goBack() {
+    // 设置全局刷新标志，提示项目页面刷新数据
+    getApp().globalData.needRefreshProject = true;
     wx.navigateBack();
   },
   

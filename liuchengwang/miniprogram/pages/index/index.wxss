@@ -89,6 +89,10 @@ page {
   font-weight: 500;
   border-radius: 12rpx;
   margin-top: 60rpx;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .footer {

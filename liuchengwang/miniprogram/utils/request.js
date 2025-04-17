@@ -1,5 +1,7 @@
 // 网络请求封装
-const BASE_URL = 'http://localhost:3000'; // 开发环境API地址，生产环境需要修改
+const app = getApp();
+// 从全局配置获取API基础地址
+const BASE_URL = app ? app.globalData.baseUrl : 'https://www.bllcw.vip/lcw-api'; // 优先使用全局配置，否则使用线上地址
 const MOCK_MODE = false; // 关闭模拟模式，使用真实API
 
 // 模拟数据
@@ -201,7 +203,30 @@ const request = (options) => {
   }
 
   // 构建完整的URL
-  const url = options.url.startsWith('http') ? options.url : BASE_URL + options.url;
+  let url;
+  if (options.url.startsWith('http')) {
+    // 如果是完整URL，直接使用
+    url = options.url;
+  } else {
+    // 从请求路径中移除开头的/api（如果有）
+    const path = options.url.startsWith('/api/') 
+      ? options.url.substring(4) // 移除/api，保留后面的斜杠
+      : options.url.startsWith('/api') 
+        ? options.url.substring(4) // 移除/api，不含斜杠的情况
+        : options.url.startsWith('/') 
+          ? options.url // 已经是以/开头但不是/api
+          : '/' + options.url; // 没有前导斜杠，添加一个
+    
+    // 添加基础URL，避免重复添加lcw-api
+    // 检查BASE_URL是否已经包含lcw-api
+    if (BASE_URL.includes('/lcw-api')) {
+      url = `${BASE_URL}${path}`;
+    } else {
+      url = `${BASE_URL}/lcw-api${path}`;
+    }
+  }
+
+  console.log('发送请求到:', url);
 
   // 获取token
   const token = wx.getStorageSync('token');
@@ -265,7 +290,7 @@ const request = (options) => {
               break;
             default:
               wx.showToast({
-                title: res.data?.message || '请求失败',
+                title: (res.data && res.data.message) || '请求失败',
                 icon: 'none'
               });
           }

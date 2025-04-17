@@ -1,4 +1,5 @@
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -49,19 +50,20 @@ Page({
         projectName: projectInfo.name
       });
     } else {
-      wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
-        method: 'GET',
-        success: (res) => {
-          if (res.statusCode === 200) {
-            this.setData({ 
-              projectName: res.data.name
-            });
-            
-            // 缓存项目信息
-            wx.setStorageSync('projectInfo', res.data);
-          }
-        }
+      request({
+        url: `/projects/${this.data.projectId}`,
+        method: 'GET'
+      })
+      .then(data => {
+        this.setData({ 
+          projectName: data.name
+        });
+        
+        // 缓存项目信息
+        wx.setStorageSync('projectInfo', data);
+      })
+      .catch(err => {
+        console.error('获取项目信息失败:', err);
       });
     }
   },
@@ -70,46 +72,57 @@ Page({
   loadPrerequisiteDeliverables() {
     this.setData({ loading: true });
     
-    wx.request({
-      url: `${app.globalData.baseUrl}/prerequisites/project/${this.data.projectId}`,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const prerequisites = res.data || [];
-          
-          // 处理交付内容数据
-          const processedDeliverables = prerequisites.map(item => {
-            return {
-              id: item.id,
-              content: item.content,
-              startDate: this.formatDate(item.start_date),
-              endDate: this.formatDate(item.expected_end_date),
-              durationDays: item.duration_days || 0,
-              status: item.status,
-              statusText: this.getStatusText(item.status)
-            };
-          });
-          
-          this.setData({
-            deliverables: processedDeliverables,
-            loading: false
-          });
-        } else {
-          wx.showToast({
-            title: '获取前置条件失败',
-            icon: 'none'
-          });
-          this.setData({ loading: false });
-        }
-      },
-      fail: (err) => {
-        console.error('请求前置条件失败:', err);
-        wx.showToast({
-          title: '网络请求失败',
-          icon: 'none'
+    request({
+      url: `/prerequisites/project/${this.data.projectId}`,
+      method: 'GET'
+    })
+    .then(data => {
+      // 确保prerequisites是数组
+      const prerequisites = data || {};
+      let processedDeliverables = [];
+      
+      // 检查prerequisites是否为数组
+      if (Array.isArray(prerequisites)) {
+        // 如果是数组，正常处理
+        processedDeliverables = prerequisites.map(item => {
+          return {
+            id: item.id,
+            content: item.content,
+            startDate: this.formatDate(item.start_date),
+            endDate: this.formatDate(item.expected_end_date),
+            durationDays: item.duration_days || 0,
+            status: item.status,
+            statusText: this.getStatusText(item.status)
+          };
         });
-        this.setData({ loading: false });
+      } else if (prerequisites && typeof prerequisites === 'object') {
+        // 如果是单个对象，将其转换为数组包装的单个元素
+        if (prerequisites.id) {
+          processedDeliverables = [{
+            id: prerequisites.id,
+            content: prerequisites.content,
+            startDate: this.formatDate(prerequisites.start_date),
+            endDate: this.formatDate(prerequisites.expected_end_date),
+            durationDays: prerequisites.duration_days || 0,
+            status: prerequisites.status,
+            statusText: this.getStatusText(prerequisites.status)
+          }];
+        }
+        console.log('前置条件数据不是数组，已进行转换:', processedDeliverables);
       }
+      
+      this.setData({
+        deliverables: processedDeliverables,
+        loading: false
+      });
+    })
+    .catch(err => {
+      console.error('请求前置条件失败:', err);
+      wx.showToast({
+        title: '获取前置条件失败',
+        icon: 'none'
+      });
+      this.setData({ loading: false });
     });
   },
   

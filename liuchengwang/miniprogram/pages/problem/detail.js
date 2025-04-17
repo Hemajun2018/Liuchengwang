@@ -1,4 +1,5 @@
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -51,16 +52,17 @@ Page({
         projectName: projectInfo.name
       });
     } else {
-      wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
-        method: 'GET',
-        success: (res) => {
-          if (res.statusCode === 200) {
-            this.setData({ 
-              projectName: res.data.name
-            });
-          }
-        }
+      request({
+        url: `/projects/${this.data.projectId}`,
+        method: 'GET'
+      })
+      .then(data => {
+        this.setData({ 
+          projectName: data.name
+        });
+      })
+      .catch(err => {
+        console.error('获取项目信息失败:', err);
       });
     }
   },
@@ -69,81 +71,71 @@ Page({
   loadNodeAndIssues() {
     this.setData({ loading: true });
     
-    wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const nodeInfo = res.data;
-          console.log('获取到的节点信息:', nodeInfo);
+    request({
+      url: `/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
+      method: 'GET'
+    })
+    .then(data => {
+      const nodeInfo = data;
+      console.log('获取到的节点信息:', nodeInfo);
+      
+      // 处理问题数据，确保日期字段正确
+      let processedIssues = [];
+      if (nodeInfo.issues && nodeInfo.issues.length > 0) {
+        processedIssues = nodeInfo.issues.map(issue => {
+          // 检查并处理日期字段
+          const processedIssue = {...issue};
           
-          // 处理问题数据，确保日期字段正确
-          let processedIssues = [];
-          if (nodeInfo.issues && nodeInfo.issues.length > 0) {
-            processedIssues = nodeInfo.issues.map(issue => {
-              // 检查并处理日期字段
-              const processedIssue = {...issue};
-              
-              // 处理开始时间
-              if (!processedIssue.start_date && processedIssue.startDate) {
-                processedIssue.start_date = processedIssue.startDate;
-              } else if (!processedIssue.start_date && processedIssue.startTime) {
-                processedIssue.start_date = processedIssue.startTime;
-              }
-              
-              // 处理结束时间
-              if (!processedIssue.expected_end_date && processedIssue.expectedEndDate) {
-                processedIssue.expected_end_date = processedIssue.expectedEndDate;
-              } else if (!processedIssue.expected_end_date && processedIssue.endTime) {
-                processedIssue.expected_end_date = processedIssue.endTime;
-              }
-              
-              // 处理完成天数
-              if (!processedIssue.duration_days && processedIssue.durationDays) {
-                processedIssue.duration_days = processedIssue.durationDays;
-              }
-              
-              // 预先格式化日期
-              processedIssue.formattedStartDate = this.formatDate(processedIssue.start_date);
-              processedIssue.formattedEndDate = this.formatDate(processedIssue.expected_end_date);
-              
-              console.log('处理后的问题日期:', processedIssue.formattedStartDate, processedIssue.formattedEndDate);
-              
-              // 测试：检查问题状态
-              console.log('问题ID:', processedIssue.id, '状态值:', processedIssue.status, '类型:', typeof processedIssue.status);
-              console.log('状态文本测试:', this.getIssueStatusText(processedIssue.status));
-              
-              // 预先计算状态文本并存储在问题对象中
-              processedIssue.statusText = this.getIssueStatusText(processedIssue.status);
-              console.log('预存的状态文本:', processedIssue.statusText);
-              
-              return processedIssue;
-            });
-            
-            console.log('处理后的第一个问题数据:', processedIssues[0]);
+          // 处理开始时间
+          if (!processedIssue.start_date && processedIssue.startDate) {
+            processedIssue.start_date = processedIssue.startDate;
+          } else if (!processedIssue.start_date && processedIssue.startTime) {
+            processedIssue.start_date = processedIssue.startTime;
           }
           
-          this.setData({
-            nodeName: nodeInfo.name || '',
-            issues: processedIssues,
-            loading: false
-          });
-        } else {
-          wx.showToast({
-            title: '获取节点信息失败',
-            icon: 'none'
-          });
-          this.setData({ loading: false });
-        }
-      },
-      fail: (err) => {
-        console.error('请求节点信息失败:', err);
-        wx.showToast({
-          title: '网络请求失败',
-          icon: 'none'
+          // 处理结束时间
+          if (!processedIssue.expected_end_date && processedIssue.expectedEndDate) {
+            processedIssue.expected_end_date = processedIssue.expectedEndDate;
+          } else if (!processedIssue.expected_end_date && processedIssue.endTime) {
+            processedIssue.expected_end_date = processedIssue.endTime;
+          }
+          
+          // 处理完成天数
+          if (!processedIssue.duration_days && processedIssue.durationDays) {
+            processedIssue.duration_days = processedIssue.durationDays;
+          }
+          
+          // 预先格式化日期
+          processedIssue.formattedStartDate = this.formatDate(processedIssue.start_date);
+          processedIssue.formattedEndDate = this.formatDate(processedIssue.expected_end_date);
+          
+          // 测试：检查问题状态
+          console.log('问题ID:', processedIssue.id, '状态值:', processedIssue.status, '类型:', typeof processedIssue.status);
+          console.log('状态文本测试:', this.getIssueStatusText(processedIssue.status));
+          
+          // 预先计算状态文本并存储在问题对象中
+          processedIssue.statusText = this.getIssueStatusText(processedIssue.status);
+          console.log('预存的状态文本:', processedIssue.statusText);
+          
+          return processedIssue;
         });
-        this.setData({ loading: false });
+        
+        console.log('处理后的第一个问题数据:', processedIssues[0]);
       }
+      
+      this.setData({
+        nodeName: nodeInfo.name || '',
+        issues: processedIssues,
+        loading: false
+      });
+    })
+    .catch(err => {
+      console.error('请求节点信息失败:', err);
+      wx.showToast({
+        title: '获取节点信息失败',
+        icon: 'none'
+      });
+      this.setData({ loading: false });
     });
   },
   
@@ -222,8 +214,10 @@ Page({
     return result;
   },
   
-  // 返回流程图
+  // 返回上一页
   goBack() {
+    // 设置全局刷新标志，提示项目页面刷新数据
+    getApp().globalData.needRefreshProject = true;
     wx.navigateBack();
   },
   

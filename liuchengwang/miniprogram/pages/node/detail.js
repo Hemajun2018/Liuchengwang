@@ -9,8 +9,6 @@ Page({
     nodeId: '',
     projectName: '',
     nodeName: '',
-    nodeStatus: 'not_started',
-    nodeStatusText: '未开始',
     deliverables: [],
     loading: true,
     error: null,
@@ -82,11 +80,8 @@ Page({
     
     if (freshNode) {
       console.log('从全局数据获取到更新的节点信息:', freshNode);
-      const statusText = this.getStatusText(freshNode.status);
       this.setData({
-        nodeName: freshNode.name || '',
-        nodeStatus: freshNode.status || 'not_started',
-        nodeStatusText: statusText
+        nodeName: freshNode.name || ''
       });
       
       // 缓存节点信息
@@ -110,12 +105,8 @@ Page({
     .then(nodeInfo => {
       console.log('成功刷新节点信息:', nodeInfo);
       
-      const statusText = this.getStatusText(nodeInfo.status);
-      
       this.setData({
         nodeName: nodeInfo.name || '',
-        nodeStatus: nodeInfo.status || 'not_started',
-        nodeStatusText: statusText,
         error: null
       });
       
@@ -199,11 +190,8 @@ Page({
     
     if (node) {
       console.log('从全局数据获取节点信息:', node);
-      const statusText = this.getStatusText(node.status);
       this.setData({
         nodeName: node.name || '',
-        nodeStatus: node.status || 'not_started',
-        nodeStatusText: statusText,
         loading: false
       });
       return;
@@ -219,11 +207,8 @@ Page({
     const cachedNode = cacheManager.getCache(cacheKey);
     if (cachedNode) {
       console.log('从缓存获取节点信息:', cachedNode);
-      const statusText = this.getStatusText(cachedNode.status);
       this.setData({
         nodeName: cachedNode.name || '',
-        nodeStatus: cachedNode.status || 'not_started',
-        nodeStatusText: statusText,
         loading: false
       });
       return;
@@ -240,8 +225,6 @@ Page({
     if (this.data.loadingFailed) {
       this.setData({
         nodeName: `节点${this.data.nodeId}`,
-        nodeStatus: 'not_started',
-        nodeStatusText: '未知状态',
         loading: false,
         error: '无法获取节点信息，请检查网络连接或联系管理员'
       });
@@ -255,12 +238,8 @@ Page({
     .then(nodeInfo => {
       console.log('获取节点信息成功:', nodeInfo);
       
-      const statusText = this.getStatusText(nodeInfo.status);
-      
       this.setData({
         nodeName: nodeInfo.name || '',
-        nodeStatus: nodeInfo.status || 'not_started',
-        nodeStatusText: statusText,
         loading: false
       });
       
@@ -277,8 +256,6 @@ Page({
       
       this.setData({
         nodeName: `节点${this.data.nodeId}`,
-        nodeStatus: 'not_started',
-        nodeStatusText: '未知状态',
         loadingFailed: true,
         loading: false,
         error: '无法获取节点信息，请检查网络连接或联系管理员'
@@ -400,6 +377,8 @@ Page({
   
   // 返回上一页
   goBack() {
+    // 设置全局刷新标志，提示项目页面刷新数据
+    getApp().globalData.needRefreshProject = true;
     wx.navigateBack();
   },
 

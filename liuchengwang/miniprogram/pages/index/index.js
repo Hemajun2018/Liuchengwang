@@ -2,6 +2,7 @@
 const app = getApp();
 const tokenManager = require('../../utils/token');
 const cacheManager = require('../../utils/cache');
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -71,61 +72,53 @@ Page({
     
     this.setData({ loading: true });
     
-    // 发送登录请求
-    wx.request({
-      url: `${app.globalData.baseUrl}/projects/verify`,
+    // 使用统一的request方法发送登录请求
+    request({
+      url: '/projects/verify',  // 移除重复的lcw-api前缀
       method: 'POST',
       data: {
         name: projectId,
         password: password
-      },
-      success: (res) => {
-        console.log('登录响应数据:', res.data);
-        
-        if (res.statusCode === 200 || res.statusCode === 201) {
-          // 登录成功，保存项目信息
-          wx.setStorageSync('projectInfo', res.data);
-          
-          // 保存token，如果后端返回了token字段
-          if (res.data.token) {
-            // 使用token管理工具保存token
-            tokenManager.saveToken(res.data.token);
-            console.log('已保存后端返回的登录令牌');
-          } else {
-            console.log('后端未返回token，请检查API响应');
-            wx.showToast({
-              title: '登录异常，请联系管理员',
-              icon: 'none'
-            });
-            return;
-          }
-          
-          // 预加载项目相关数据
-          this.preloadProjectData(res.data.id);
-          
-          // 跳转到项目页面
-          wx.redirectTo({
-            url: `/pages/project/index?projectId=${res.data.id}`
-          });
-        } else {
-          // 登录失败
-          wx.showToast({
-            title: res.data.message || '登录失败，请检查项目ID和密码',
-            icon: 'none'
-          });
-        }
-      },
-      fail: (err) => {
-        console.error('登录请求失败:', err);
+      }
+    })
+    .then(data => {
+      console.log('登录响应数据:', data);
+      
+      // 登录成功，保存项目信息
+      wx.setStorageSync('projectInfo', data);
+      
+      // 保存token，如果后端返回了token字段
+      if (data.token) {
+        // 使用token管理工具保存token
+        tokenManager.saveToken(data.token);
+        console.log('已保存后端返回的登录令牌');
+      } else {
+        console.log('后端未返回token，请检查API响应');
         wx.showToast({
-          title: '网络请求失败',
+          title: '登录异常，请联系管理员',
           icon: 'none'
         });
-      },
-      complete: () => {
-        console.log('登录请求完成');
-        this.setData({ loading: false });
+        return;
       }
+      
+      // 预加载项目相关数据
+      this.preloadProjectData(data.id);
+      
+      // 跳转到项目页面
+      wx.redirectTo({
+        url: `/pages/project/index?projectId=${data.id}`
+      });
+    })
+    .catch(err => {
+      console.error('登录请求失败:', err);
+      wx.showToast({
+        title: err.message || '登录失败，请检查项目ID和密码',
+        icon: 'none'
+      });
+    })
+    .finally(() => {
+      console.log('登录请求完成');
+      this.setData({ loading: false });
     });
   },
   
@@ -137,52 +130,44 @@ Page({
     const cacheKeyPattern = `cache_project_${projectId}`;
     cacheManager.clearAllCache([cacheKeyPattern]);
     
-    // 加载项目节点数据
-    wx.request({
-      url: `${app.globalData.baseUrl}/projects/${projectId}/nodes`,
-      method: 'GET',
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenManager.getToken(false)}` // 不验证token有效性
-      },
-      success: (res) => {
-        if (res.statusCode === 200) {
-          console.log('预加载节点数据成功:', res.data);
-          const nodes = res.data;
-          
-          // 从节点中提取成果数据
-          const results = [];
-          nodes.forEach(node => {
-            if (node.results && node.results.length > 0) {
-              results.push(...node.results);
-            }
-          });
-          
-          // 缓存节点数据
-          const nodesCacheKey = cacheManager.createProjectCacheKey(projectId, 'nodes');
-          cacheManager.setCache(nodesCacheKey, nodes);
-          
-          if (results.length > 0) {
-            console.log('从节点中提取的成果数据:', results);
-            
-            // 更新项目信息
-            const projectInfo = wx.getStorageSync('projectInfo') || {};
-            projectInfo.results = results;
-            
-            // 保存到本地存储
-            wx.setStorageSync('projectInfo', projectInfo);
-            
-            // 缓存成果数据
-            const resultsCacheKey = cacheManager.createProjectCacheKey(projectId, 'results');
-            cacheManager.setCache(resultsCacheKey, results);
-          }
-        } else {
-          console.error('预加载节点数据失败:', res);
+    // 使用统一的request方法加载项目节点数据
+    request({
+      url: `/projects/${projectId}/nodes`,  // 移除重复的lcw-api前缀
+      method: 'GET'
+    })
+    .then(data => {
+      console.log('预加载节点数据成功:', data);
+      const nodes = data;
+      
+      // 从节点中提取成果数据
+      const results = [];
+      nodes.forEach(node => {
+        if (node.results && node.results.length > 0) {
+          results.push(...node.results);
         }
-      },
-      fail: (err) => {
-        console.error('预加载节点数据请求失败:', err);
+      });
+      
+      // 缓存节点数据
+      const nodesCacheKey = cacheManager.createProjectCacheKey(projectId, 'nodes');
+      cacheManager.setCache(nodesCacheKey, nodes);
+      
+      if (results.length > 0) {
+        console.log('从节点中提取的成果数据:', results);
+        
+        // 更新项目信息
+        const projectInfo = wx.getStorageSync('projectInfo') || {};
+        projectInfo.results = results;
+        
+        // 保存到本地存储
+        wx.setStorageSync('projectInfo', projectInfo);
+        
+        // 缓存成果数据
+        const resultsCacheKey = cacheManager.createProjectCacheKey(projectId, 'results');
+        cacheManager.setCache(resultsCacheKey, results);
       }
+    })
+    .catch(err => {
+      console.error('预加载节点数据失败:', err);
     });
   }
 });

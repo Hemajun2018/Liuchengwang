@@ -51,7 +51,7 @@ Page({
       });
     } else {
       wx.request({
-        url: `${app.globalData.baseUrl}/projects/${this.data.projectId}`,
+        url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}`,
         method: 'GET',
         success: (res) => {
           if (res.statusCode === 200) {
@@ -72,7 +72,7 @@ Page({
     this.setData({ loading: true });
     
     wx.request({
-      url: `${app.globalData.baseUrl}/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
+      url: `${app.globalData.baseUrl}/lcw-api/projects/${this.data.projectId}/nodes/${this.data.nodeId}`,
       method: 'GET',
       success: (res) => {
         if (res.statusCode === 200) {
@@ -140,6 +140,8 @@ Page({
   
   // 返回上一页
   goBack() {
+    // 设置全局刷新标志，提示项目页面刷新数据
+    getApp().globalData.needRefreshProject = true;
     wx.navigateBack();
   }
 }); 

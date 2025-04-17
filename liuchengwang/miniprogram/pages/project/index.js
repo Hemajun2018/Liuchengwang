@@ -36,9 +36,24 @@ Page({
   
   onShow() {
     console.log('项目页面显示');
-    // 每次显示页面时重新加载节点列表，但使用静默刷新
-    if (this.data.projectId) {
-      this.loadNodeList(true);
+    
+    // 检查全局刷新标志
+    const needRefresh = getApp().globalData.needRefreshProject || false;
+    
+    if (needRefresh) {
+      // 需要强制刷新，清除相关缓存
+      console.log('检测到需要刷新项目页面数据');
+      const cacheKeyPattern = `cache_project_${this.data.projectId}`;
+      cacheManager.clearAllCache([cacheKeyPattern]);
+      
+      // 重置刷新标志
+      getApp().globalData.needRefreshProject = false;
+      
+      // 从服务器重新加载数据（非静默模式）
+      this.loadProjectInfo(false);
+    } else {
+      // 正常加载（使用缓存）
+      this.loadProjectInfo(true);
     }
   },
   
